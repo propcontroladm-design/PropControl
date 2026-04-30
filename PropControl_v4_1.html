@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PropControl v4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#16a34a;--green-bg:#dcfce7;--green-text:#14532d;
+  --red:#dc2626;--red-bg:#fee2e2;--red-text:#7f1d1d;
+  --yellow:#d97706;--yellow-bg:#fef3c7;--yellow-text:#78350f;
+  --blue:#2563eb;--blue-bg:#dbeafe;--blue-text:#1e3a8a;
+  --gray:#6b7280;--gray-bg:#f3f4f6;--gray-text:#111827;
+  --border:#e5e7eb;--surface:#fff;--page:#f9fafb;
+  --text:#111827;--text2:#6b7280;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--page);color:var(--text);min-height:100vh;font-size:15px}
+#root{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+button{cursor:pointer;border:none;font-family:inherit;font-size:15px}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--text)}
+
+/* NAV */
+.nav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 8px;gap:4px}
+.nav-title{flex:1;text-align:center;font-weight:700;font-size:17px;letter-spacing:-.3px;padding:14px 0}
+.nav-user{width:32px;height:32px;border-radius:50%;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:none;flex-shrink:0;cursor:pointer}
+.nav-btn{background:none;color:var(--blue);padding:10px 6px;font-size:13px;font-weight:600;white-space:nowrap}
+
+/* SYNC */
+.sync-bar{background:#fff;border-bottom:1px solid var(--border);padding:5px 14px;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2)}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-dot.ok{background:var(--green)}.sync-dot.off{background:var(--gray)}.sync-dot.loading{background:var(--blue);animation:pulse 1s infinite}.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* TABS */
+.tabs{display:flex;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:50px;padding:10px 2px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);border-bottom:2px solid transparent;background:none;white-space:nowrap}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-icon{display:block;font-size:16px;margin-bottom:2px}
+
+.content{flex:1;padding:16px}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-row:last-child{margin-bottom:0}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-paid{background:var(--green-bg);color:var(--green-text)}
+.badge-pending{background:var(--red-bg);color:var(--red-text)}
+.badge-partial{background:var(--yellow-bg);color:var(--yellow-text)}
+.badge-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot-paid{background:var(--green)}.dot-pending{background:var(--red)}.dot-partial{background:var(--yellow)}
+
+/* PROPERTY DASHBOARD CARD */
+.prop-card{background:var(--surface);border-radius:16px;border:1px solid var(--border);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.prop-id{font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-bg);padding:2px 7px;border-radius:5px;display:inline-block;margin-bottom:4px}
+.prop-name{font-size:16px;font-weight:700;margin-bottom:1px}
+.prop-sub{font-size:12px;color:var(--text2);margin-bottom:10px}
+.prop-amounts{display:flex;gap:7px;margin-bottom:10px}
+.amount-box{flex:1;background:var(--gray-bg);border-radius:9px;padding:8px;text-align:center}
+.amount-label{font-size:10px;color:var(--text2);margin-bottom:1px}
+.amount-val{font-size:14px;font-weight:700}
+.amount-val.green{color:var(--green)}.amount-val.red{color:var(--red)}.amount-val.yellow{color:var(--yellow)}
+.prop-actions{display:flex;gap:6px}
+.btn-pay{flex:1;background:var(--blue);color:#fff;padding:10px;border-radius:9px;font-weight:600;font-size:14px}
+.btn-wa{background:#25d366;color:#fff;padding:10px 12px;border-radius:9px;font-size:15px;border:none;cursor:pointer}
+.btn-sm{background:var(--gray-bg);color:var(--gray-text);padding:10px 11px;border-radius:9px;font-size:13px}
+
+/* FORMS */
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.form-input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;background:#fff;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:var(--blue)}
+.form-select{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;background:#fff;outline:none;appearance:none}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+.form-hint{font-size:12px;color:var(--text2);margin-top:4px}
+.form-check{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px}
+.form-check input{width:18px;height:18px;cursor:pointer;accent-color:var(--blue)}
+
+/* CURRENCY */
+.currency-wrap{display:flex;border:1.5px solid var(--border);border-radius:10px;overflow:hidden}
+.currency-select{border:none;background:var(--gray-bg);padding:11px 10px;font-size:14px;font-weight:600;outline:none;border-right:1px solid var(--border);min-width:80px;color:var(--text)}
+.currency-input{flex:1;border:none;padding:11px 13px;font-size:15px;outline:none;background:#fff;min-width:0}
+
+/* PAYMENT METHOD */
+.pay-method-row{display:flex;gap:8px;margin-bottom:12px}
+.pay-method-btn{flex:1;padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:600;color:var(--text2);text-align:center;cursor:pointer;transition:all .15s}
+.pay-method-btn.active{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+
+.section-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 10px}
+.tramo-card{background:var(--gray-bg);border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid var(--border)}
+.tramo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+
+/* BUTTONS */
+.btn-primary{width:100%;background:var(--blue);color:#fff;padding:13px;border-radius:12px;font-size:16px;font-weight:700;margin-top:8px}
+.btn-secondary{background:none;border:1.5px solid var(--border);color:var(--text);padding:11px;border-radius:10px;font-size:14px;font-weight:600;width:100%}
+.btn-add{background:var(--blue-bg);color:var(--blue);padding:9px 13px;border-radius:10px;font-size:14px;font-weight:600;width:100%;margin-top:6px}
+.btn-danger{background:var(--red-bg);color:var(--red-text);padding:11px;border-radius:10px;font-size:14px;font-weight:600;width:100%;margin-top:8px}
+.btn-google{width:100%;background:#fff;border:1.5px solid var(--border);color:var(--text);padding:12px;border-radius:12px;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:93vh;overflow-y:auto;padding:18px 16px 44px}
+.modal-handle{width:38px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
+
+/* STATS */
+.stats-row{display:flex;gap:8px;margin-bottom:14px}
+.stat-box{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px;text-align:center}
+.stat-num{font-size:20px;font-weight:800;margin-bottom:1px}
+.stat-label{font-size:10px;color:var(--text2)}
+
+/* VARIABLES */
+.var-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:10px}
+.var-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.var-row:last-child{margin-bottom:0}
+.var-label{font-size:13px;color:var(--text2);flex:1}
+.var-input{width:120px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;text-align:right;background:#fff}
+
+/* MONTH ROW */
+.month-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.month-row:last-child{border-bottom:none}
+
+/* MISC */
+.empty{text-align:center;padding:48px 20px;color:var(--text2)}
+.empty-icon{font-size:44px;margin-bottom:10px}
+.empty-msg{font-size:15px;font-weight:500;margin-bottom:5px;color:var(--text)}
+.empty-sub{font-size:13px}
+
+.alert{padding:11px 13px;border-radius:10px;font-size:13px;margin-bottom:12px;line-height:1.5}
+.alert-info{background:var(--blue-bg);color:var(--blue-text)}
+.alert-success{background:var(--green-bg);color:var(--green-text)}
+.alert-warn{background:var(--yellow-bg);color:var(--yellow-text)}
+
+.chip{display:inline-block;background:var(--gray-bg);color:var(--text2);padding:3px 9px;border-radius:20px;font-size:12px;margin-right:4px;margin-bottom:3px}
+.fab{position:fixed;bottom:22px;right:18px;width:54px;height:54px;background:var(--blue);color:#fff;border-radius:27px;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(37,99,235,.4);z-index:150;border:none;cursor:pointer}
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.3px;margin-right:3px;margin-bottom:2px}
+.tag-local{background:#fef3c7;color:#78350f}
+.tag-depto{background:#e0f2fe;color:#0c4a6e}
+.tag-terreno{background:#dcfce7;color:#14532d}
+.tag-otro{background:#f3e8ff;color:#581c87}
+.tag-fijo{background:#e0f2fe;color:#0c4a6e}
+.tag-escalonado{background:#f3e8ff;color:#581c87}
+.tag-pesos{background:#dcfce7;color:#166534}
+.tag-dolar{background:#fef3c7;color:#78350f}
+.tag-nafta{background:#fce7f3;color:#831843}
+
+/* PROPERTY LIST CARD */
+.proplist-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:9px;box-shadow:var(--shadow)}
+.proplist-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.proplist-id{font-size:11px;font-weight:700;color:var(--blue)}
+.proplist-name{font-size:15px;font-weight:700;margin-bottom:2px}
+.proplist-addr{font-size:12px;color:var(--text2)}
+.proplist-actions{display:flex;gap:6px;margin-top:8px}
+
+/* INQUILINO CARD */
+.inq-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.inq-avatar{width:38px;height:38px;border-radius:19px;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+.inq-info{flex:1;margin-left:11px}
+.inq-name{font-size:15px;font-weight:700}
+.inq-detail{font-size:12px;color:var(--text2);margin-top:1px}
+.inq-actions{display:flex;gap:6px}
+
+/* GASTO */
+.gasto-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:8px}
+.gasto-row{display:flex;justify-content:space-between;align-items:flex-start}
+.gasto-info{flex:1}
+.gasto-tipo{font-size:14px;font-weight:700}
+.gasto-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.gasto-monto-box{text-align:right}
+.gasto-monto{font-size:15px;font-weight:700}
+.gasto-quien{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* SETUP */
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.setup-step{display:flex;gap:11px;margin-bottom:12px;align-items:flex-start}
+.setup-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px}
+.setup-text{font-size:13px;line-height:1.5;flex:1}
+.code-block{background:var(--gray-bg);border-radius:7px;padding:9px 11px;font-family:monospace;font-size:12px;word-break:break-all;margin-top:5px}
+
+/* PAGO DETALLE */
+.pago-detail{background:var(--gray-bg);border-radius:9px;padding:10px;margin-top:8px;font-size:13px}
+.pago-detail-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.pago-detail-row:last-child{margin-bottom:0}
+
+/* SEARCH */
+.search-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:#fff;outline:none;margin-bottom:12px}
+.search-input:focus{border-color:var(--blue)}
+
+/* v4 NEW STYLES */
+.pago-item{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+.pago-item-left{flex:1}
+.pago-item-monto{font-size:14px;font-weight:700}
+.pago-item-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.pago-item-del{background:none;border:none;color:var(--red);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1}
+.grupo-badge{display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#4c1d95;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;margin-right:4px}
+.tab-sub{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.tab-sub::-webkit-scrollbar{display:none}
+.tab-sub-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.tab-sub-btn.active{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+.idx-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}
+.idx-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.idx-name{font-size:15px;font-weight:700}
+.owner-chip{display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#4c1d95;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;margin-right:4px;margin-bottom:4px}
+.roi-bar{height:6px;border-radius:3px;background:var(--gray-bg);margin-top:6px;overflow:hidden}
+.roi-fill{height:100%;border-radius:3px;background:var(--green)}
+.roi-fill.neg{background:var(--red)}
+.expensa-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px;margin-bottom:9px}
+.expensa-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.expensa-title{font-size:14px;font-weight:700}
+.expensa-rows{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.expensa-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--gray-bg);border-radius:8px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const CONFIG={
+  CLIENT_ID:'306802428190-2trbo3t0gf8uil59a48hb2a98o4dgfr2.apps.googleusercontent.com',
+  SCOPES:'https://www.googleapis.com/auth/drive.file',
+  FILE_NAME:'propcontrol_v4.json',
+};
+
+const{useState,useEffect,useCallback,useRef,useMemo}=React;
+const h=React.createElement;
+
+// ═══════════════════════════════════════════
+// PROPIEDADES INICIALES (del Excel)
+// ═══════════════════════════════════════════
+const PROPS_INICIALES=[
+  {id:'prop_2044L',codigo:'2044L',nombre:'Av. Aconquija 2044',direccion:'Av. Aconquija 2044',ciudad:'Yerba Buena',tipo:'otro',superficie:2500,ambientes:'',obs:'Edificio completo de 3 pisos',activo:true},
+  {id:'prop_CRISTO',codigo:'CRISTO',nombre:'El Cristo',direccion:'El Cristo',ciudad:'Yerba Buena',tipo:'terreno',superficie:'',ambientes:'',obs:'',activo:true},
+  {id:'prop_2044E',codigo:'2044E',nombre:'Av. Aconquija 2044 (Terreno)',direccion:'Av. Aconquija 2044',ciudad:'Yerba Buena',tipo:'terreno',superficie:'',ambientes:'',obs:'',activo:true},
+  {id:'prop_HL01',codigo:'HL01',nombre:'Punto Heller L1',direccion:'Av. Aconquija 598, Punto Heller, L1',ciudad:'Yerba Buena',tipo:'local',superficie:14.3,ambientes:1,obs:'Local sin baño',activo:true},
+  {id:'prop_HL02',codigo:'HL02',nombre:'Punto Heller L2',direccion:'Av. Aconquija 598, Punto Heller, L2',ciudad:'Yerba Buena',tipo:'local',superficie:25.07,ambientes:1,obs:'Básico sanitario previsto para baño',activo:true},
+  {id:'prop_HL03',codigo:'HL03',nombre:'Punto Heller L3',direccion:'Av. Aconquija 598, Punto Heller, L3',ciudad:'Yerba Buena',tipo:'local',superficie:31.71,ambientes:1,obs:'Básico sanitario previsto para baño',activo:true},
+  {id:'prop_HL04',codigo:'HL04',nombre:'Punto Heller L4',direccion:'Av. Aconquija 598, Punto Heller, L4',ciudad:'Yerba Buena',tipo:'local',superficie:31.71,ambientes:1,obs:'Básico sanitario previsto para baño',activo:true},
+  {id:'prop_HL05',codigo:'HL05',nombre:'Punto Heller L5',direccion:'Av. Aconquija 598, Punto Heller, L5',ciudad:'Yerba Buena',tipo:'local',superficie:31.71,ambientes:1,obs:'Básico sanitario previsto para baño',activo:true},
+  {id:'prop_HL06',codigo:'HL06',nombre:'Punto Heller L6',direccion:'Av. Aconquija 598, Punto Heller, L6',ciudad:'Yerba Buena',tipo:'local',superficie:30.8,ambientes:1,obs:'Básico sanitario previsto para baño',activo:true},
+  {id:'prop_HL07',codigo:'HL07',nombre:'Punto Heller L7',direccion:'Av. Aconquija 598, Punto Heller, L7',ciudad:'Yerba Buena',tipo:'local',superficie:65.28,ambientes:2,obs:'Cuenta con baño y antebaño',activo:true},
+  {id:'prop_HL08',codigo:'HL08',nombre:'Punto Heller L8',direccion:'Av. Aconquija 598, Punto Heller, L8',ciudad:'Yerba Buena',tipo:'local',superficie:148.92,ambientes:3,obs:'Local en esquina con cocina y gas natural',activo:true},
+  {id:'prop_HL09',codigo:'HL09',nombre:'Punto Heller L9',direccion:'Av. Aconquija 598, Punto Heller, L9',ciudad:'Yerba Buena',tipo:'local',superficie:396,ambientes:3,obs:'Hall PB (38.8m²), Salón PA (327.6m²), Baños PB (29.6m²)',activo:true},
+  {id:'prop_HL10',codigo:'HL10',nombre:'Punto Heller L10',direccion:'Heller 30, Punto Heller, L10',ciudad:'Yerba Buena',tipo:'local',superficie:34.77,ambientes:1,obs:'Sin baño',activo:true},
+  {id:'prop_HL11',codigo:'HL11',nombre:'Punto Heller L11',direccion:'Heller 30, Punto Heller, L11',ciudad:'Yerba Buena',tipo:'local',superficie:36.5,ambientes:1,obs:'Sin baño',activo:true},
+  {id:'prop_HL12',codigo:'HL12',nombre:'Punto Heller L12',direccion:'Heller 30, Punto Heller, L12',ciudad:'Yerba Buena',tipo:'local',superficie:30.91,ambientes:1,obs:'Sin baño',activo:true},
+  {id:'prop_HL13',codigo:'HL13',nombre:'Punto Heller L13',direccion:'Heller 30, Punto Heller, L13',ciudad:'Yerba Buena',tipo:'local',superficie:33.42,ambientes:1,obs:'Sin baño',activo:true},
+  {id:'prop_HL14',codigo:'HL14',nombre:'Punto Heller L14',direccion:'Heller 30, Punto Heller, L14',ciudad:'Yerba Buena',tipo:'local',superficie:37.38,ambientes:1,obs:'Baño con antebaño',activo:true},
+  {id:'prop_HL15',codigo:'HL15',nombre:'Punto Heller L15',direccion:'Heller 30, Punto Heller, L15',ciudad:'Yerba Buena',tipo:'local',superficie:47.46,ambientes:1,obs:'PB (32.43m²) + Entrepiso (14.86m²)',activo:true},
+  {id:'prop_HL16',codigo:'HL16',nombre:'Punto Heller L16',direccion:'Heller 30, Punto Heller, L16',ciudad:'Yerba Buena',tipo:'local',superficie:47.38,ambientes:1,obs:'PB (32.52m²) + Entrepiso (14.86m²)',activo:true},
+  {id:'prop_DH01',codigo:'DH01',nombre:'Heller Depto D1',direccion:'Heller 32, Punto Heller, D1',ciudad:'Yerba Buena',tipo:'depto',superficie:55.67,ambientes:2,obs:'Cocina-Living (21.17m²), Dorm (10.69m²), Vestidor (4.59m²), Patio (15m²)',activo:true},
+  {id:'prop_DH02',codigo:'DH02',nombre:'Heller Depto D2',direccion:'Heller 32, Punto Heller, D2',ciudad:'Yerba Buena',tipo:'depto',superficie:71.51,ambientes:2,obs:'Cocina (6.98m²), Living (24.11m²), Dorm (17.62m²), Patio (15.18m²)',activo:true},
+  {id:'prop_DH03',codigo:'DH03',nombre:'Heller Depto D3',direccion:'Heller 32, Punto Heller, D3',ciudad:'Yerba Buena',tipo:'depto',superficie:37.77,ambientes:2,obs:'',activo:true},
+  {id:'prop_DH04',codigo:'DH04',nombre:'Heller Depto D4',direccion:'Heller 32, Punto Heller, D4',ciudad:'Yerba Buena',tipo:'depto',superficie:41.76,ambientes:2,obs:'Cocina-Living (23.6m²), Dorm (12m²), Patio (5.73m²)',activo:true},
+  {id:'prop_DH05',codigo:'DH05',nombre:'Heller Depto D5',direccion:'Heller 32, Punto Heller, D5',ciudad:'Yerba Buena',tipo:'depto',superficie:63.25,ambientes:3,obs:'Cocina (7m²), Living (23.98m²), Dorm1 (11.16m²), Dorm2 (12.22m²), Baño (4.29m²)',activo:true},
+  {id:'prop_DH06',codigo:'DH06',nombre:'Heller Depto D6',direccion:'Heller 32, Punto Heller, D6',ciudad:'Yerba Buena',tipo:'depto',superficie:47.36,ambientes:2,obs:'Living-Cocina (25.8m²), Dorm (11.38m²), Baño (5.29m²)',activo:true},
+  {id:'prop_DH07',codigo:'DH07',nombre:'Heller Depto D7',direccion:'Heller 32, Punto Heller, D7',ciudad:'Yerba Buena',tipo:'depto',superficie:59.02,ambientes:2,obs:'Living (25.31m²), Dorm (18.43m²), Baño (4.1m²), Cocina (6.35m²), Toilette (2.51m²)',activo:true},
+  {id:'prop_DH08',codigo:'DH08',nombre:'Heller Depto D8',direccion:'Heller 32, Punto Heller, D8',ciudad:'Yerba Buena',tipo:'depto',superficie:39.56,ambientes:2,obs:'Living-Cocina (20.87m²), Dorm (12.42m²), Baño (3.66m²)',activo:true},
+  {id:'prop_DH09',codigo:'DH09',nombre:'Heller Depto D9',direccion:'Heller 32, Punto Heller, D9',ciudad:'Yerba Buena',tipo:'depto',superficie:54.97,ambientes:2,obs:'Living-Cocina (36.11m²), Dorm (13.73m²), Baño (3.72m²)',activo:true},
+  {id:'prop_DH10',codigo:'DH10',nombre:'Heller Depto D10',direccion:'Heller 32, Punto Heller, D10',ciudad:'Yerba Buena',tipo:'depto',superficie:42.55,ambientes:2,obs:'Living-Cocina (24.84m²), Dorm (12.63m²), Baño (3.83m²)',activo:true},
+  {id:'prop_DH11',codigo:'DH11',nombre:'Heller Depto D11',direccion:'Heller 32, Punto Heller, D11',ciudad:'Yerba Buena',tipo:'depto',superficie:34.21,ambientes:2,obs:'Living-Cocina (18.14m²), Dorm (12.27m²), Baño (3.80m²)',activo:true},
+  {id:'prop_DH13',codigo:'DH13',nombre:'Heller Depto D13',direccion:'Heller 32, Punto Heller, D13',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_DH14',codigo:'DH14',nombre:'Heller Depto D14',direccion:'Heller 32, Punto Heller, D14',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_DH15',codigo:'DH15',nombre:'Heller Depto D15',direccion:'Heller 32, Punto Heller, D15',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_DH16',codigo:'DH16',nombre:'Heller Depto D16',direccion:'Heller 32, Punto Heller, D16',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_DH17',codigo:'DH17',nombre:'Heller Depto D17',direccion:'Heller 32, Punto Heller, D17',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_DH18',codigo:'DH18',nombre:'Heller Depto D18',direccion:'Heller 32, Punto Heller, D18',ciudad:'Yerba Buena',tipo:'depto',superficie:47.74,ambientes:2,obs:'Living-Cocina (26.46m²), Dorm (12.62m²), Baño (3.30m²), Toilette (2.41m²), Patio (2.95m²)',activo:true},
+  {id:'prop_MZALOCAL',codigo:'MZA LOCAL',nombre:'Mendoza 815 Local PB',direccion:'Mendoza 815, Local PB',ciudad:'San Miguel de Tucumán',tipo:'local',superficie:47.74,ambientes:2,obs:'',activo:true},
+];
+
+
+// ═══ GRUPOS INICIALES ════════════════════════
+const GRUPOS_INICIALES=[
+  {id:'grp_heller_av',nombre:'Punto Heller — Av. Aconquija 598',descripcion:'Locales L1 a L9'},
+  {id:'grp_heller_30',nombre:'Punto Heller — Heller 30',descripcion:'Locales L10 a L16'},
+  {id:'grp_heller_32',nombre:'Punto Heller — Heller 32',descripcion:'Departamentos D1 a D18'},
+];
+
+// ═══ MIGRATE PAGOS: object → array ═══════════
+function migrarPagos(pagos){
+  const m={};
+  Object.entries(pagos||{}).forEach(([k,v])=>{m[k]=Array.isArray(v)?v:[{...v,id:uid()}]});
+  return m;
+}
+
+// ═══ ESTADO PAGO (pagos múltiples) ═══════════
+function estadoPagoV4(alqId,mk,pagos,esperadoPesos){
+  const lista=pagos[`${alqId}_${mk}`]||[];
+  const esp=esperadoPesos||0;
+  const total=lista.reduce((s,p)=>s+(p.montoPesos||p.monto||0),0);
+  const diff=total-esp;
+  return{estado:diff>=-0.5?'pagado':(total>0?'parcial':'pendiente'),pagado:total,esperado:esp,diferencia:diff,lista};
+}
+
+// ═══ CALCULAR MONTO V4 (frecuencia + custom idx) ═
+function calcularMontoV4(alquiler,year,month,variables,indices){
+  if(!alquiler?.contrato)return null;
+  const c=alquiler.contrato;
+  const mk=mesKey(year,month);
+  const vm=variables[mk]||{};
+  const inicio=new Date((alquiler.fechaInicio||'2025-01-01')+'T00:00:00');
+  const mesRel=(year-inicio.getFullYear())*12+(month-inicio.getMonth())+1;
+
+  const calcTramoV4=(base,moneda,ajuste,indiceId,frecuencia)=>{
+    let monto=parseFloat(base)||0;
+    const freq=frecuencia||'mensual';
+    const aplica=freq==='mensual'||(freq==='trimestral'&&(mesRel-1)%3===0)||(freq==='semestral'&&(mesRel-1)%6===0)||(freq==='anual'&&(mesRel-1)%12===0);
+    if(aplica){
+      if(ajuste==='ipc'&&vm.ipc)monto=monto*(1+vm.ipc/100);
+      else if(ajuste==='custom'&&indiceId&&indices){
+        const idx=(indices||[]).find(i=>i.id===indiceId);
+        const val=idx?.valores?.[mk];
+        if(val)monto=monto*(1+val/100);
+      }
+    }
+    const ivaF=c.iva?1.21:1;
+    return{monto:monto*ivaF,moneda:moneda||'pesos',iva:!!c.iva};
+  };
+
+  if(c.tipo==='fijo')return calcTramoV4(c.montoBase,c.moneda,c.ajuste,c.indiceId,c.frecuenciaAjuste);
+  if(c.tipo==='escalonado'){
+    const t=(c.tramos||[]).find(t=>mesRel>=t.mesDesde&&mesRel<=t.mesHasta);
+    if(!t)return null;
+    return calcTramoV4(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecuenciaAjuste);
+  }
+  return null;
+}
+
+// ═══ MODAL PAGO MÚLTIPLE V4 ══════════════════
+function ModalPagoV4({alquiler,mes,montoEsperadoObj,vm,pagosDelMes,onClose,onAdd,onDel,inquilinos}){
+  const monedaC=montoEsperadoObj?.moneda||'pesos';
+  const espNum=montoEsperadoObj?.monto||0;
+  const espPesos=montoAPesos(montoEsperadoObj,vm)||0;
+  const[monto,setMonto]=useState('');
+  const[moneda,setMoneda]=useState(monedaC);
+  const[tipo,setTipo]=useState('transferencia');
+  const[det,setDet]=useState('');
+  const inq=inquilinos.find(i=>i.id===alquiler.inquilinoId);
+  const lista=pagosDelMes||[];
+  const totalPag=lista.reduce((s,p)=>s+(p.montoPesos||0),0);
+  const mp=useMemo(()=>{const n=parseFloat(monto)||0;if(moneda==='pesos')return n;if(moneda==='dolar')return n*(vm?.dolar||0);if(moneda==='nafta')return n*(vm?.nafta||0);return n},[monto,moneda,vm]);
+
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},'Registrar Pago'),
+      h('div',{style:{marginBottom:12}},h('span',{className:'chip'},mesLabel(mes.year,mes.month)),h('span',{className:'chip'},alquiler.nombrePropiedad||''),inq&&h('span',{className:'chip'},inq.nombre)),
+      lista.length>0&&h('div',null,
+        h('p',{className:'section-title'},'Pagos del período'),
+        lista.map(p=>h('div',{key:p.id,className:'pago-item'},
+          h('div',{className:'pago-item-left'},
+            h('div',{className:'pago-item-monto'},fmtNum(p.monto,p.moneda)+(p.moneda!=='pesos'?` ≈ ${fmtNum(p.montoPesos,'pesos')}`:'') ),
+            h('div',{className:'pago-item-meta'},(p.tipoPago==='transferencia'?'🏦':p.tipoPago==='cheque'?'📋':'💵')+' '+(p.tipoPago||'')+(p.detallePago?' · '+p.detallePago:'')+' · '+p.fecha)
+          ),
+          h('button',{className:'pago-item-del',onClick:()=>onDel(p.id)},'×')
+        )),
+        h('div',{className:`alert ${totalPag>=espPesos?'alert-success':'alert-warn'}`},totalPag>=espPesos?`✓ Cubierto: ${fmtNum(totalPag,'pesos')}`:`Pagado: ${fmtNum(totalPag,'pesos')} | Falta: ${fmtNum(espPesos-totalPag,'pesos')}`)
+      ),
+      h('p',{className:'section-title'},'Agregar pago'),
+      montoEsperadoObj&&h('div',{className:'alert alert-info'},`Esperado: ${fmtNum(espNum,monedaC)}${montoEsperadoObj.iva?' (con IVA 21%)':''}`),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Monto'),
+        h('div',{className:'currency-wrap'},
+          h('select',{className:'currency-select',value:moneda,onChange:(e)=>setMoneda(e.target.value)},h('option',{value:'pesos'},'$ Pesos'),h('option',{value:'dolar'},'U$D Dólar'),h('option',{value:'nafta'},'L Nafta')),
+          h('input',{className:'currency-input',type:'number',inputMode:'numeric',placeholder:'0',value:monto,onChange:(e)=>setMonto(e.target.value),autoFocus:true})
+        )
+      ),
+      moneda!=='pesos'&&mp>0&&h('div',{className:'alert alert-info'},`≈ ${fmtNum(mp,'pesos')}`),
+      h('p',{className:'section-title'},'Forma de pago'),
+      h('div',{className:'pay-method-row'},['transferencia','cheque','efectivo'].map(t=>h('button',{key:t,className:`pay-method-btn ${tipo===t?'active':''}`,onClick:()=>setTipo(t)},t==='transferencia'?'🏦 Transf.':t==='cheque'?'📋 Cheque':'💵 Efectivo'))),
+      tipo==='transferencia'&&h('div',{className:'form-group'},h('label',{className:'form-label'},'Destinatario'),h('input',{className:'form-input',placeholder:'A nombre de...',value:det,onChange:(e)=>setDet(e.target.value)})),
+      tipo==='cheque'&&h('div',{className:'form-group'},h('label',{className:'form-label'},'N° cheque y banco'),h('input',{className:'form-input',placeholder:'Ej: 00012345 - Banco Nación',value:det,onChange:(e)=>setDet(e.target.value)})),
+      h('button',{className:'btn-primary',onClick:()=>{if(monto&&parseFloat(monto)>0){onAdd({monto:parseFloat(monto),moneda,montoPesos:mp,tipoPago:tipo,detallePago:det});setMonto('');setDet('')}}},`+ Agregar pago`),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cerrar')
+    )
+  );
+}
+
+// ═══ TAB PROPIETARIOS ════════════════════════
+function TabPropietarios({propietarios,propiedades,alquileres,pagos,setModal}){
+  const mesActualKey=mesKey(NOW.getFullYear(),NOW.getMonth());
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},`${propietarios.length} propietarios`),
+    propietarios.length===0&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'👔'),h('div',{className:'empty-msg'},'Sin propietarios'),h('div',{className:'empty-sub'},'Tocá + para agregar')),
+    propietarios.map(own=>{
+      const propsAsoc=propiedades.filter(p=>(p.propietarios||[]).find(pr=>pr.ownId===own.id));
+      let ingresos=0;
+      propsAsoc.forEach(prop=>{
+        const pct=(prop.propietarios||[]).find(pr=>pr.ownId===own.id)?.porcentaje||100;
+        alquileres.filter(a=>a.propiedadId===prop.id&&a.activo!==false).forEach(a=>{
+          const lista=pagos[`${a.id}_${mesActualKey}`]||[];
+          ingresos+=lista.reduce((s,p)=>s+(p.montoPesos||0),0)*(pct/100);
+        });
+      });
+      return h('div',{key:own.id,className:'card'},
+        h('div',{className:'card-row'},
+          h('div',null,h('div',{style:{fontWeight:700,fontSize:15}},own.nombre),h('div',{style:{fontSize:13,color:'var(--text2)'}},(own.cuit?'CUIT: '+own.cuit+' · ':'')+propsAsoc.length+' propiedades')),
+          h('div',{style:{textAlign:'right'}},h('div',{style:{fontSize:11,color:'var(--text2)'}},'Este mes'),h('div',{style:{fontSize:15,fontWeight:700,color:'var(--green)'}},fmtNum(ingresos,'pesos')))
+        ),
+        propsAsoc.length>0&&h('div',{style:{marginTop:6}},propsAsoc.map(p=>h('span',{key:p.id,className:'owner-chip'},p.codigo+' '+((p.propietarios||[]).find(pr=>pr.ownId===own.id)?.porcentaje||100)+'%'))),
+        h('div',{style:{display:'flex',gap:6,marginTop:10}},h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setModal({type:'owner',data:own})},'Editar'))
+      );
+    }),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ═══ TAB VARIABLES V4 (+ índices) ═══════════
+function TabVariablesV4({variables,setVar,indices,addIndice,setIndiceVal,delIndice}){
+  const[subTab,setSubTab]=useState('vars');
+  const[nuevoIdx,setNuevoIdx]=useState('');
+  const meses=[];
+  for(let i=-1;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mesKey(d.getFullYear(),d.getMonth())})}
+  const fields=[{id:'dolar',label:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',label:'Nafta ($ por litro)',ph:'950'},{id:'ipc',label:'IPC variación (%)',ph:'4.5'}];
+  return h('div',{className:'content'},
+    h('div',{className:'tab-sub'},
+      h('button',{className:`tab-sub-btn ${subTab==='vars'?'active':''}`,onClick:()=>setSubTab('vars')},'📈 Variables base'),
+      h('button',{className:`tab-sub-btn ${subTab==='idx'?'active':''}`,onClick:()=>setSubTab('idx')},'🔧 Índices propios')
+    ),
+    subTab==='vars'&&h('div',null,
+      h('div',{className:'alert alert-info'},'Cargá una vez por mes. Se aplican automáticamente.'),
+      meses.map(m=>{
+        const v=variables[m.key]||{};
+        const esAct=m.key===mesKey(NOW.getFullYear(),NOW.getMonth());
+        return h('div',{key:m.key,className:'var-card',style:{border:esAct?'2px solid var(--blue)':''}},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},h('span',{style:{fontWeight:700,fontSize:15}},mesLabel(m.year,m.month)),esAct&&h('span',{style:{fontSize:11,background:'var(--blue-bg)',color:'var(--blue)',padding:'2px 8px',borderRadius:20,fontWeight:600}},'Actual')),
+          fields.map(f=>h('div',{key:f.id,className:'var-row'},h('span',{className:'var-label'},f.label),h('input',{className:'var-input',type:'number',placeholder:f.ph,value:v[f.id]||'',onChange:(e)=>setVar(m.key,f.id,e.target.value)})))
+        );
+      })
+    ),
+    subTab==='idx'&&h('div',null,
+      h('div',{className:'alert alert-info'},'Creá índices propios (Dólar Blue, etc.) y cargá variación mensual en %.'),
+      h('div',{style:{display:'flex',gap:8,marginBottom:14}},
+        h('input',{className:'form-input',style:{flex:1},placeholder:'Nombre del índice',value:nuevoIdx,onChange:(e)=>setNuevoIdx(e.target.value)}),
+        h('button',{className:'btn-primary',style:{width:'auto',padding:'0 16px',marginTop:0},onClick:()=>{if(nuevoIdx.trim()){addIndice({nombre:nuevoIdx.trim()});setNuevoIdx('')}}},'Crear')
+      ),
+      indices.length===0&&h('div',{className:'empty',style:{padding:'24px 0'}},h('div',{className:'empty-icon'},'📊'),h('div',{className:'empty-msg'},'Sin índices personalizados')),
+      indices.map(idx=>h('div',{key:idx.id,className:'idx-card'},
+        h('div',{className:'idx-header'},h('span',{className:'idx-name'},idx.nombre),h('button',{onClick:()=>delIndice(idx.id),style:{background:'var(--red-bg)',color:'var(--red-text)',border:'none',padding:'4px 10px',borderRadius:7,fontSize:12,cursor:'pointer'}},'Eliminar')),
+        meses.map(m=>h('div',{key:m.key,className:'var-row'},h('span',{className:'var-label',style:{fontSize:12}},mesLabel(m.year,m.month)+' (%)'),h('input',{className:'var-input',type:'number',placeholder:'0',value:(idx.valores||{})[m.key]||'',onChange:(e)=>setIndiceVal(idx.id,m.key,e.target.value)})))
+      ))
+    )
+  );
+}
+
+// ═══ TAB ROI ═════════════════════════════════
+function TabROI({propiedades,alquileres,pagos,gastos,grupos}){
+  const[filtroGrupo,setFiltroGrupo]=useState('');
+  const props=propiedades.filter(p=>p.activo&&(!filtroGrupo||p.grupoId===filtroGrupo));
+  let totI=0,totG=0,totInv=0;
+  const rows=props.map(prop=>{
+    let ingresos=0;
+    alquileres.filter(a=>a.propiedadId===prop.id).forEach(a=>{
+      Object.keys(pagos).filter(k=>k.startsWith(a.id+'_')).forEach(k=>{
+        (pagos[k]||[]).forEach(p=>ingresos+=(p.montoPesos||0));
+      });
+    });
+    const gastoProp=gastos.filter(g=>g.propiedadId===prop.id).reduce((s,g)=>s+g.monto,0);
+    const vc=prop.roi?.valorCompra||0;
+    const inv=vc+gastoProp;
+    const res=ingresos-gastoProp;
+    const roi=inv>0?((res/inv)*100):null;
+    totI+=ingresos;totG+=gastoProp;totInv+=inv;
+    return{prop,ingresos,gastoProp,resultado:res,roi};
+  });
+  const totRes=totI-totG;const totROI=totInv>0?((totRes/totInv)*100):null;
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},'ROI & Rentabilidad'),
+    grupos.length>0&&h('div',{className:'tab-sub'},h('button',{className:`tab-sub-btn ${!filtroGrupo?'active':''}`,onClick:()=>setFiltroGrupo('')},'Todas'),...grupos.map(g=>h('button',{key:g.id,className:`tab-sub-btn ${filtroGrupo===g.id?'active':''}`,onClick:()=>setFiltroGrupo(g.id)},g.nombre.split('—')[1]?.trim()||g.nombre))),
+    h('div',{className:'stats-row'},
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--green)',fontSize:14}},fmtNum(totI,'pesos')),h('div',{className:'stat-label'},'Ingresos')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--red)',fontSize:14}},fmtNum(totG,'pesos')),h('div',{className:'stat-label'},'Gastos')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:totROI!=null&&totROI>=0?'var(--green)':'var(--red)'}},totROI!=null?totROI.toFixed(1)+'%':'—'),h('div',{className:'stat-label'},'ROI total'))
+    ),
+    rows.map(({prop,ingresos,gastoProp,resultado,roi})=>h('div',{key:prop.id,className:'card'},
+      h('div',{className:'card-row'},
+        h('div',null,h('div',{style:{fontWeight:700}},prop.nombre),h('div',{style:{fontSize:12,color:'var(--text2)'}},prop.roi?.valorCompra>0?'Compra: '+fmtNum(prop.roi.valorCompra,'pesos'):'Sin valor de compra')),
+        h('div',{style:{textAlign:'right'}},h('div',{style:{fontSize:18,fontWeight:800,color:roi!=null&&roi>=0?'var(--green)':'var(--red)'}},roi!=null?roi.toFixed(1)+'%':'—'),h('div',{style:{fontSize:10,color:'var(--text2)'}},'ROI'))
+      ),
+      h('div',{style:{display:'flex',gap:6,marginTop:8}},
+        h('div',{style:{flex:1,background:'var(--green-bg)',borderRadius:8,padding:'6px 10px',textAlign:'center'}},h('div',{style:{fontSize:10,color:'var(--green-text)'}},'Ingresos'),h('div',{style:{fontSize:13,fontWeight:700,color:'var(--green)'}},fmtNum(ingresos,'pesos'))),
+        h('div',{style:{flex:1,background:'var(--red-bg)',borderRadius:8,padding:'6px 10px',textAlign:'center'}},h('div',{style:{fontSize:10,color:'var(--red-text)'}},'Gastos'),h('div',{style:{fontSize:13,fontWeight:700,color:'var(--red)'}},fmtNum(gastoProp,'pesos'))),
+        h('div',{style:{flex:1,background:resultado>=0?'var(--green-bg)':'var(--red-bg)',borderRadius:8,padding:'6px 10px',textAlign:'center'}},h('div',{style:{fontSize:10,color:resultado>=0?'var(--green-text)':'var(--red-text)'}},'Neto'),h('div',{style:{fontSize:13,fontWeight:700,color:resultado>=0?'var(--green)':'var(--red)'}},fmtNum(resultado,'pesos')))
+      ),
+      roi!=null&&h('div',{className:'roi-bar'},h('div',{className:`roi-fill ${roi<0?'neg':''}`,style:{width:Math.min(Math.abs(roi),100)+'%'}}))
+    )),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ═══ TAB EXPENSAS ════════════════════════════
+function TabExpensas({expensas,propiedades,grupos,addExpensa,updExpensaPago,delExpensa}){
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({grupoId:'',mes:mesKey(NOW.getFullYear(),NOW.getMonth()),montoTotal:'',distribucion:'proporcional'});
+  const upF=(f,v)=>setForm(p=>({...p,[f]:v}));
+  const handleAdd=()=>{
+    if(!form.grupoId||!form.montoTotal)return;
+    const propsGrupo=propiedades.filter(p=>p.grupoId===form.grupoId&&p.activo);
+    const pagosInit={};
+    propsGrupo.forEach(p=>{const monto=form.distribucion==='proporcional'?(parseFloat(form.montoTotal)||0)*(p.porcentajeExpensas||0)/100:0;pagosInit[p.id]={monto,pagado:false}});
+    addExpensa({...form,montoTotal:parseFloat(form.montoTotal)||0,pagos:pagosInit});
+    setShowForm(false);setForm({grupoId:'',mes:mesKey(NOW.getFullYear(),NOW.getMonth()),montoTotal:'',distribucion:'proporcional'});
+  };
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},'Gestión de Expensas'),
+    h('button',{className:'btn-add',style:{marginBottom:12},onClick:()=>setShowForm(!showForm)},showForm?'Cancelar':'+ Nueva liquidación'),
+    showForm&&h('div',{className:'card'},
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Edificio / Grupo'),h('select',{className:'form-select',value:form.grupoId,onChange:(e)=>upF('grupoId',e.target.value)},h('option',{value:''},'— Seleccionar —'),grupos.map(g=>h('option',{key:g.id,value:g.id},g.nombre)))),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Período'),h('input',{className:'form-input',type:'month',value:form.mes,onChange:(e)=>upF('mes',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Monto total ($)'),h('input',{className:'form-input',type:'number',placeholder:'0',value:form.montoTotal,onChange:(e)=>upF('montoTotal',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Distribución'),h('select',{className:'form-select',value:form.distribucion,onChange:(e)=>upF('distribucion',e.target.value)},h('option',{value:'proporcional'},'Proporcional (% de cada unidad)'),h('option',{value:'manual'},'Manual'))),
+      form.grupoId&&form.montoTotal&&form.distribucion==='proporcional'&&h('div',{className:'alert alert-info'},'Vista previa: '+propiedades.filter(p=>p.grupoId===form.grupoId).map(p=>`${p.codigo}: ${fmtNum((parseFloat(form.montoTotal)||0)*(p.porcentajeExpensas||0)/100,'pesos')}`).join(' · ')),
+      h('button',{className:'btn-primary',style:{marginTop:8},onClick:handleAdd},'Crear liquidación')
+    ),
+    expensas.length===0&&!showForm&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'🏢'),h('div',{className:'empty-msg'},'Sin liquidaciones')),
+    expensas.map(exp=>{
+      const grupo=grupos.find(g=>g.id===exp.grupoId);
+      const propsExp=propiedades.filter(p=>p.grupoId===exp.grupoId);
+      const totPag=Object.values(exp.pagos||{}).filter(p=>p.pagado).reduce((s,p)=>s+(p.monto||0),0);
+      return h('div',{key:exp.id,className:'expensa-card'},
+        h('div',{className:'expensa-header'},
+          h('div',null,h('div',{className:'expensa-title'},grupo?.nombre||'Grupo'),h('div',{style:{fontSize:12,color:'var(--text2)'}},'Período: '+exp.mes+' · Total: '+fmtNum(exp.montoTotal,'pesos'))),
+          h('button',{onClick:()=>delExpensa(exp.id),style:{background:'var(--red-bg)',color:'var(--red-text)',border:'none',padding:'4px 10px',borderRadius:7,fontSize:12,cursor:'pointer'}},'×')
+        ),
+        h('div',{style:{fontSize:12,color:'var(--text2)',marginBottom:6}},'Recaudado: '+fmtNum(totPag,'pesos')+' / '+fmtNum(exp.montoTotal,'pesos')),
+        h('div',{className:'expensa-rows'},
+          propsExp.map(prop=>{
+            const pd=exp.pagos?.[prop.id]||{monto:0,pagado:false};
+            return h('div',{key:prop.id,className:'expensa-row'},
+              h('span',{style:{fontWeight:600}},prop.codigo),
+              h('span',fmtNum(pd.monto,'pesos')),
+              h('button',{onClick:()=>updExpensaPago(exp.id,prop.id,!pd.pagado),style:{background:pd.pagado?'var(--green-bg)':'var(--gray-bg)',color:pd.pagado?'var(--green-text)':'var(--text2)',border:'none',padding:'3px 10px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}},pd.pagado?'✓ Pagado':'Pendiente')
+            );
+          })
+        )
+      );
+    }),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ═══ FORM PROPIETARIO ════════════════════════
+function FormOwner({initial,onSave,onDelete,onClose}){
+  const[d,setD]=useState(initial||{nombre:'',telefono:'',email:'',cuit:'',obs:''});
+  const[cd,setCd]=useState(false);
+  const up=(f,v)=>setD(p=>({...p,[f]:v}));
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},initial?'Editar propietario':'Nuevo propietario'),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Nombre / Razón social'),h('input',{className:'form-input',placeholder:'Juan Pérez',value:d.nombre,onChange:(e)=>up('nombre',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'CUIT'),h('input',{className:'form-input',placeholder:'20-12345678-9',value:d.cuit||'',onChange:(e)=>up('cuit',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Teléfono'),h('input',{className:'form-input',type:'tel',value:d.telefono,onChange:(e)=>up('telefono',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Email'),h('input',{className:'form-input',type:'email',value:d.email,onChange:(e)=>up('email',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Observaciones'),h('textarea',{className:'form-input',rows:2,value:d.obs,onChange:(e)=>up('obs',e.target.value)})),
+      h('button',{className:'btn-primary',disabled:!d.nombre.trim(),style:{opacity:d.nombre.trim()?1:.5},onClick:()=>{if(d.nombre.trim()){onSave(d);onClose()}}},'Guardar'),
+      initial&&!cd&&h('button',{className:'btn-danger',onClick:()=>setCd(true)},'Eliminar'),
+      cd&&h('div',{style:{marginTop:8}},h('p',{style:{fontSize:13,color:'var(--red)',marginBottom:8,textAlign:'center'}},'¿Eliminar?'),h('div',{style:{display:'flex',gap:8}},h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setCd(false)},'Cancelar'),h('button',{className:'btn-danger',style:{marginTop:0,flex:1},onClick:()=>{onDelete();onClose()}},'Eliminar'))),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const NOW=new Date();
+const uid=()=>Math.random().toString(36).slice(2,9);
+const mesKey=(y,m)=>`${y}-${String(m+1).padStart(2,'0')}`;
+const mesLabel=(y,m)=>MESES[m]+' '+y;
+
+function fmtNum(n,moneda){
+  if(n==null||isNaN(n))return '—';
+  const r=Math.round(n).toLocaleString('es-AR');
+  if(moneda==='dolar')return 'U$D '+r;
+  if(moneda==='nafta')return r+' L';
+  return '$'+r;
+}
+
+function generarMeses(fechaInicio){
+  const inicio=new Date((fechaInicio||'2025-05-01')+'T00:00:00');
+  const meses=[];
+  const start=new Date(NOW.getFullYear(),4,1);
+  const end=new Date(NOW.getFullYear()+1,NOW.getMonth()+2,1);
+  let cur=new Date(Math.max(inicio.getTime(),start.getTime()));
+  cur=new Date(cur.getFullYear(),cur.getMonth(),1);
+  while(cur<=end){
+    meses.push({year:cur.getFullYear(),month:cur.getMonth(),key:mesKey(cur.getFullYear(),cur.getMonth())});
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+  return meses;
+}
+
+function calcularMonto(alquiler,year,month,variables){
+  if(!alquiler?.contrato)return null;
+  const c=alquiler.contrato;
+  const vm=variables[mesKey(year,month)]||{};
+  if(c.tipo==='fijo'){
+    return aplicarCalc(parseFloat(c.montoBase)||0,c.moneda||'pesos',c.ajuste,vm,c.iva);
+  }
+  if(c.tipo==='escalonado'){
+    const inicio=new Date((alquiler.fechaInicio||'2025-01-01')+'T00:00:00');
+    const mr=(year-inicio.getFullYear())*12+(month-inicio.getMonth())+1;
+    const t=(c.tramos||[]).find(t=>mr>=t.mesDesde&&mr<=t.mesHasta);
+    if(!t)return null;
+    return aplicarCalc(parseFloat(t.montoBase)||0,t.moneda||c.moneda||'pesos',t.ajuste,vm,c.iva);
+  }
+  return null;
+}
+
+function aplicarCalc(base,moneda,ajuste,vm,iva){
+  let monto=base;
+  if(ajuste==='ipc'&&vm.ipc)monto=monto*(1+vm.ipc/100);
+  const ivaFactor=iva?1.21:1;
+  return{monto:monto*ivaFactor,moneda:moneda||'pesos',iva:!!iva};
+}
+
+function montoAPesos(montoObj,vm){
+  if(!montoObj)return null;
+  if(montoObj.moneda==='pesos')return montoObj.monto;
+  if(montoObj.moneda==='dolar'&&vm?.dolar)return montoObj.monto*vm.dolar;
+  if(montoObj.moneda==='nafta'&&vm?.nafta)return montoObj.monto*vm.nafta;
+  return montoObj.monto;
+}
+
+// legacy compat - now uses arrays
+function estadoPago(alqId,mk,pagos,esperadoPesos){
+  const raw=pagos[`${alqId}_${mk}`];
+  const esp=esperadoPesos||0;
+  if(!raw)return{estado:'pendiente',pagado:0,esperado:esp,diferencia:-esp,lista:[]};
+  const lista=Array.isArray(raw)?raw:[raw];
+  const total=lista.reduce((s,p)=>s+(p.montoPesos||p.monto||0),0);
+  const diff=total-esp;
+  return{estado:diff>=-0.5?'pagado':(total>0?'parcial':'pendiente'),
+    pagado:total,esperado:esp,diferencia:diff,lista,
+    monto:lista[0]?.monto,moneda:lista[0]?.moneda,tipoPago:lista[0]?.tipoPago,detallePago:lista[0]?.detallePago,fecha:lista[0]?.fecha};
+}
+
+function waURL(tel,msg){
+  const t=tel.replace(/\D/g,'');
+  return`https://wa.me/${t}?text=${encodeURIComponent(msg)}`;
+}
+
+// ═══════════════════════════════════════════
+// DRIVE SERVICE
+// ═══════════════════════════════════════════
+class DriveService{
+  constructor(){this.token=null;this.fileId=null}
+  hasClientId(){return CONFIG.CLIENT_ID&&CONFIG.CLIENT_ID.length>10}
+  async signIn(){
+    return new Promise((res,rej)=>{
+      if(!window.google){rej(new Error('Google no cargó'));return}
+      const c=window.google.accounts.oauth2.initTokenClient({
+        client_id:CONFIG.CLIENT_ID,scope:CONFIG.SCOPES,
+        callback:(r)=>{if(r.error){rej(new Error(r.error));return}this.token=r.access_token;res(r)}
+      });
+      c.requestAccessToken();
+    });
+  }
+  signOut(){this.token=null;this.fileId=null}
+  async findFile(){
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${CONFIG.FILE_NAME}'+and+trashed=false&fields=files(id,modifiedTime)`,{headers:{Authorization:`Bearer ${this.token}`}});
+    const d=await r.json();
+    if(d.files?.length>0){this.fileId=d.files[0].id;return d.files[0]}
+    return null;
+  }
+  async load(){
+    const f=await this.findFile();if(!f)return null;
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files/${this.fileId}?alt=media`,{headers:{Authorization:`Bearer ${this.token}`}});
+    try{return JSON.parse(await r.text())}catch{return null}
+  }
+  async save(data){
+    const body=JSON.stringify(data);
+    const meta=JSON.stringify({name:CONFIG.FILE_NAME,mimeType:'application/json'});
+    const b='alqboundary';
+    const payload=`--${b}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`;
+    const url=this.fileId
+      ?`https://www.googleapis.com/upload/drive/v3/files/${this.fileId}?uploadType=multipart`
+      :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const method=this.fileId?'PATCH':'POST';
+    const r=await fetch(url,{method,headers:{Authorization:`Bearer ${this.token}`,'Content-Type':`multipart/related; boundary=${b}`},body:payload});
+    if(!this.fileId){const d=await r.json();this.fileId=d.id}
+  }
+}
+const drive=new DriveService();
+
+// ═══════════════════════════════════════════
+// STORE
+// ═══════════════════════════════════════════
+function useStore(){
+  const load=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch{return def}};
+  const[propiedades,setPropiedades]=useState(()=>load('pc4_props',PROPS_INICIALES));
+  const[inquilinos,setInquilinos]=useState(()=>load('pc4_inqs',[]));
+  const[alquileres,setAlquileres]=useState(()=>load('pc4_alqs',[]));
+  const[pagos,setPagos]=useState(()=>migrarPagos(load('pc4_pagos',{})));
+  const[variables,setVariables]=useState(()=>load('pc4_vars',{}));
+  const[gastos,setGastos]=useState(()=>load('pc4_gastos',[]));
+  // v4 new
+  const[grupos,setGrupos]=useState(()=>load('pc4_grupos',GRUPOS_INICIALES));
+  const[propietariosOwn,setPropietariosOwn]=useState(()=>load('pc4_owners',[]));
+  const[indices,setIndices]=useState(()=>load('pc4_indices',[]));
+  const[expensas,setExpensas]=useState(()=>load('pc4_expensas',[]));
+  const[driveUser,setDriveUser]=useState(null);
+  const[syncStatus,setSyncStatus]=useState('off');
+  const[lastSync,setLastSync]=useState(null);
+  const pending=useRef(null);
+
+  const persist=(pr,inq,alq,pag,va,gas,grp,own,idx,exp)=>{
+    localStorage.setItem('pc4_props',JSON.stringify(pr));
+    localStorage.setItem('pc4_inqs',JSON.stringify(inq));
+    localStorage.setItem('pc4_alqs',JSON.stringify(alq));
+    localStorage.setItem('pc4_pagos',JSON.stringify(pag));
+    localStorage.setItem('pc4_vars',JSON.stringify(va));
+    localStorage.setItem('pc4_gastos',JSON.stringify(gas));
+    localStorage.setItem('pc4_grupos',JSON.stringify(grp||[]));
+    localStorage.setItem('pc4_owners',JSON.stringify(own||[]));
+    localStorage.setItem('pc4_indices',JSON.stringify(idx||[]));
+    localStorage.setItem('pc4_expensas',JSON.stringify(exp||[]));
+    localStorage.setItem('pc4_ts',Date.now().toString());
+  };
+
+  const pushDrive=useCallback(async(pr,inq,alq,pag,va,gas)=>{
+    if(!drive.token)return;
+    setSyncStatus('loading');
+    try{await drive.save({propiedades:pr,inquilinos:inq,alquileres:alq,pagos:pag,variables:va,gastos:gas,grupos:grupos,propietarios:propietariosOwn,indices:idx||indices,expensas:exp||expensas,ts:Date.now()});setSyncStatus('ok');setLastSync(new Date())}
+    catch{setSyncStatus('error')}
+  },[]);
+
+  const schedule=(pr,inq,alq,pag,va,gas)=>{clearTimeout(pending.current);pending.current=setTimeout(()=>pushDrive(pr,inq,alq,pag,va,gas),2000)};
+
+  const apply=(data)=>{
+    if(!data)return;
+    const pr=data.propiedades||PROPS_INICIALES,inq=data.inquilinos||[],alq=data.alquileres||[],
+      pag=migrarPagos(data.pagos||{}),va=data.variables||{},gas=data.gastos||[],
+      grp=data.grupos||GRUPOS_INICIALES,own=data.propietarios||[],idx=data.indices||[],exp=data.expensas||[];
+    setPropiedades(pr);setInquilinos(inq);setAlquileres(alq);setPagos(pag);setVariables(va);setGastos(gas);
+    setGrupos(grp);setPropietariosOwn(own);setIndices(idx);setExpensas(exp);
+    persist(pr,inq,alq,pag,va,gas,grp,own,idx,exp);
+  };
+
+  const signIn=async()=>{
+    setSyncStatus('loading');
+    try{
+      await drive.signIn();
+      const ur=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${drive.token}`}});
+      setDriveUser(await ur.json());
+      const remote=await drive.load();
+      const localTs=parseInt(localStorage.getItem('pc4_ts')||'0');
+      if(remote?.ts>=localTs)apply(remote);
+      else await pushDrive(propiedades,inquilinos,alquileres,pagos,variables,gastos);
+      setSyncStatus('ok');setLastSync(new Date());
+    }catch(e){setSyncStatus('error');console.error(e)}
+  };
+  const signOut=()=>{drive.signOut();setDriveUser(null);setSyncStatus('off')};
+  const pullDrive=async()=>{if(!drive.token)return;setSyncStatus('loading');try{apply(await drive.load());setSyncStatus('ok');setLastSync(new Date())}catch{setSyncStatus('error')}};
+
+  const mut=(fn)=>{
+    let np=propiedades,ni=inquilinos,na=alquileres,npg=pagos,nv=variables,ng=gastos;
+    fn({set:(p,i,a,pg,v,g)=>{np=p;ni=i;na=a;npg=pg;nv=v;ng=g}});
+    setPropiedades(np);setInquilinos(ni);setAlquileres(na);setPagos(npg);setVariables(nv);setGastos(ng);
+    persist(np,ni,na,npg,nv,ng);schedule(np,ni,na,npg,nv,ng);
+  };
+
+  // PROPIEDADES
+  const addProp=p=>mut(({set})=>set([...propiedades,{...p,id:uid()}],inquilinos,alquileres,pagos,variables,gastos));
+  const updProp=(id,p)=>mut(({set})=>set(propiedades.map(x=>x.id===id?{...p,id}:x),inquilinos,alquileres,pagos,variables,gastos));
+  const delProp=(id)=>mut(({set})=>set(propiedades.filter(x=>x.id!==id),inquilinos,alquileres,pagos,variables,gastos));
+
+  // INQUILINOS
+  const addInq=i=>mut(({set})=>set(propiedades,[...inquilinos,{...i,id:uid()}],alquileres,pagos,variables,gastos));
+  const updInq=(id,i)=>mut(({set})=>set(propiedades,inquilinos.map(x=>x.id===id?{...i,id}:x),alquileres,pagos,variables,gastos));
+  const delInq=(id)=>mut(({set})=>set(propiedades,inquilinos.filter(x=>x.id!==id),alquileres,pagos,variables,gastos));
+
+  // ALQUILERES
+  const addAlq=a=>mut(({set})=>set(propiedades,inquilinos,[...alquileres,{...a,id:uid(),activo:true}],pagos,variables,gastos));
+  const updAlq=(id,a)=>mut(({set})=>set(propiedades,inquilinos,alquileres.map(x=>x.id===id?{...a,id}:x),pagos,variables,gastos));
+  const delAlq=(id)=>{const np={...pagos};Object.keys(np).filter(k=>k.startsWith(id+'_')).forEach(k=>delete np[k]);mut(({set})=>set(propiedades,inquilinos,alquileres.filter(x=>x.id!==id),np,variables,gastos))};
+
+  // PAGOS
+  const regPago=(alqId,mk,monto,moneda,montoPesos,tipoPago,detallePago)=>{
+    const k=`${alqId}_${mk}`;
+    const np={...pagos,[k]:{monto:parseFloat(monto),moneda,montoPesos:parseFloat(montoPesos),tipoPago,detallePago,fecha:new Date().toISOString().slice(0,10)}};
+    mut(({set})=>set(propiedades,inquilinos,alquileres,np,variables,gastos));
+  };
+  const delPago=(alqId,mk)=>{const k=`${alqId}_${mk}`;const np={...pagos};delete np[k];mut(({set})=>set(propiedades,inquilinos,alquileres,np,variables,gastos))};
+
+  // VARIABLES
+  const setVar=(mk,field,val)=>{
+    const nv={...variables,[mk]:{...(variables[mk]||{}),[field]:parseFloat(val)||0}};
+    mut(({set})=>set(propiedades,inquilinos,alquileres,pagos,nv,gastos));
+  };
+
+  // GASTOS
+  const addGasto=g=>mut(({set})=>set(propiedades,inquilinos,alquileres,pagos,variables,[...gastos,{...g,id:uid()}]));
+  const delGasto=(id)=>mut(({set})=>set(propiedades,inquilinos,alquileres,pagos,variables,gastos.filter(x=>x.id!==id)));
+
+  // v4 mutations
+  const addPagoV4=(alqId,mk,pago)=>{const k=`${alqId}_${mk}`;const lista=[...(pagos[k]||[]),{...pago,id:uid(),fecha:new Date().toISOString().slice(0,10)}];setPagos({...pagos,[k]:lista});persist(propiedades,inquilinos,alquileres,{...pagos,[k]:lista},variables,gastos,grupos,propietariosOwn,indices,expensas)};
+  const delPagoV4=(alqId,mk,pagoId)=>{const k=`${alqId}_${mk}`;const lista=(pagos[k]||[]).filter(p=>p.id!==pagoId);const np={...pagos};if(lista.length>0)np[k]=lista;else delete np[k];setPagos(np);persist(propiedades,inquilinos,alquileres,np,variables,gastos,grupos,propietariosOwn,indices,expensas)};
+  const addGrupo=g=>{const ng=[...grupos,{...g,id:uid()}];setGrupos(ng);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,ng,propietariosOwn,indices,expensas)};
+  const delGrupo=(id)=>{const ng=grupos.filter(x=>x.id!==id);setGrupos(ng);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,ng,propietariosOwn,indices,expensas)};
+  const addOwnerFn=o=>{const no=[...propietariosOwn,{...o,id:uid()}];setPropietariosOwn(no);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,no,indices,expensas)};
+  const updOwnerFn=(id,o)=>{const no=propietariosOwn.map(x=>x.id===id?{...o,id}:x);setPropietariosOwn(no);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,no,indices,expensas)};
+  const delOwnerFn=(id)=>{const no=propietariosOwn.filter(x=>x.id!==id);setPropietariosOwn(no);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,no,indices,expensas)};
+  const addIndiceFn=i=>{const ni=[...indices,{...i,id:uid(),valores:{}}];setIndices(ni);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,ni,expensas)};
+  const setIndiceValFn=(id,mk,val)=>{const ni=indices.map(i=>i.id===id?{...i,valores:{...(i.valores||{}),[mk]:parseFloat(val)||0}}:i);setIndices(ni);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,ni,expensas)};
+  const delIndiceFn=(id)=>{const ni=indices.filter(x=>x.id!==id);setIndices(ni);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,ni,expensas)};
+  const addExpensaFn=e=>{const ne=[...expensas,{...e,id:uid()}];setExpensas(ne);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,indices,ne)};
+  const updExpensaPagoFn=(expId,propId,pagado)=>{const ne=expensas.map(e=>e.id===expId?{...e,pagos:{...(e.pagos||{}),[propId]:{...e.pagos?.[propId],pagado}}}:e);setExpensas(ne);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,indices,ne)};
+  const delExpensaFn=(id)=>{const ne=expensas.filter(x=>x.id!==id);setExpensas(ne);persist(propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietariosOwn,indices,ne)};
+
+  return{propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietarios:propietariosOwn,indices,expensas,
+    addProp,updProp,delProp,addInq,updInq,delInq,addAlq,updAlq,delAlq,
+    regPago,delPago,setVar,addGasto,delGasto,
+    addPagoV4,delPagoV4,addGrupo,delGrupo,addOwner:addOwnerFn,updOwner:updOwnerFn,delOwner:delOwnerFn,
+    addIndice:addIndiceFn,setIndiceVal:setIndiceValFn,delIndice:delIndiceFn,
+    addExpensa:addExpensaFn,updExpensaPago:updExpensaPagoFn,delExpensa:delExpensaFn,
+    driveUser,syncStatus,lastSync,signIn,signOut,pullDrive};
+}
+
+// ═══════════════════════════════════════════
+// UI COMPONENTS
+// ═══════════════════════════════════════════
+function Badge({estado}){
+  const m={pagado:['badge-paid','dot-paid','✓ Pagado'],parcial:['badge-partial','dot-partial','~ Parcial'],pendiente:['badge-pending','dot-pending','✗ Pendiente']};
+  const[cls,dot,lbl]=m[estado]||m.pendiente;
+  return h('span',{className:`badge ${cls}`},h('span',{className:`badge-dot ${dot}`}),lbl);
+}
+
+function SyncBar({status,lastSync,user,onPull}){
+  const msgs={off:'Sin sincronización Drive',loading:'Sincronizando...',ok:'Sincronizado',error:'Error al sincronizar'};
+  const ts=lastSync?` · ${lastSync.getHours()}:${String(lastSync.getMinutes()).padStart(2,'0')}`:' ';
+  return h('div',{className:'sync-bar'},
+    h('span',{className:`sync-dot ${status}`}),
+    h('span',{style:{flex:1}},msgs[status]+(status==='ok'?ts:'')),
+    user&&h('button',{onClick:onPull,style:{background:'none',border:'none',color:'var(--blue)',fontSize:12,fontWeight:600,cursor:'pointer'}},'↓ Actualizar')
+  );
+}
+
+// ─── MODAL PAGO ────────────────────────────
+function ModalPago({alquiler,mes,montoEsperadoObj,vm,pagoActual,onClose,onSave,onDelete,inquilinos}){
+  const monedaContrato=montoEsperadoObj?.moneda||'pesos';
+  const esperadoNum=montoEsperadoObj?.monto||0;
+  const esperadoPesos=montoAPesos(montoEsperadoObj,vm)||0;
+
+  const[monto,setMonto]=useState(pagoActual?String(pagoActual.monto):esperadoNum?String(Math.round(esperadoNum)):'');
+  const[moneda,setMoneda]=useState(pagoActual?.moneda||monedaContrato);
+  const[tipoPago,setTipoPago]=useState(pagoActual?.tipoPago||'transferencia');
+  const[detalle,setDetalle]=useState(pagoActual?.detallePago||'');
+  const[confirmDel,setConfirmDel]=useState(false);
+
+  const montoPesos=useMemo(()=>{
+    const n=parseFloat(monto)||0;
+    if(moneda==='pesos')return n;
+    if(moneda==='dolar')return n*(vm?.dolar||0);
+    if(moneda==='nafta')return n*(vm?.nafta||0);
+    return n;
+  },[monto,moneda,vm]);
+
+  const inq=inquilinos.find(i=>i.id===alquiler.inquilinoId);
+
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},'Registrar Pago'),
+      h('div',{style:{marginBottom:12}},
+        h('span',{className:'chip'},mesLabel(mes.year,mes.month)),
+        h('span',{className:'chip'},alquiler.nombrePropiedad||'Propiedad'),
+        inq&&h('span',{className:'chip'},inq.nombre)
+      ),
+
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Monto pagado'),
+        h('div',{className:'currency-wrap'},
+          h('select',{className:'currency-select',value:moneda,onChange:(e)=>setMoneda(e.target.value)},
+            h('option',{value:'pesos'},'$ Pesos'),
+            h('option',{value:'dolar'},'U$D Dólar'),
+            h('option',{value:'nafta'},'L Nafta')
+          ),
+          h('input',{className:'currency-input',type:'number',inputMode:'numeric',placeholder:'0',value:monto,onChange:(e)=>setMonto(e.target.value),autoFocus:true})
+        )
+      ),
+
+      montoEsperadoObj&&h('div',{className:'alert alert-info'},
+        `Esperado: ${fmtNum(esperadoNum,monedaContrato)}${monedaContrato!=='pesos'&&vm?.dolar?` ≈ ${fmtNum(esperadoPesos,'pesos')}`:''}${montoEsperadoObj.iva?' (con IVA 21%)':''}`
+      ),
+
+      moneda!=='pesos'&&montoPesos>0&&h('div',{className:'alert alert-info'},
+        `Equivalente en pesos: ${fmtNum(montoPesos,'pesos')}`
+      ),
+
+      monto&&esperadoPesos&&montoPesos>=esperadoPesos&&h('div',{className:'alert alert-success'},
+        `✓ Pago completo${montoPesos>esperadoPesos?' (saldo a favor: '+fmtNum(montoPesos-esperadoPesos,'pesos')+')':''}`
+      ),
+      monto&&esperadoPesos&&montoPesos<esperadoPesos&&montoPesos>0&&h('div',{className:'alert alert-warn'},
+        `Falta: ${fmtNum(esperadoPesos-montoPesos,'pesos')}`
+      ),
+
+      h('p',{className:'section-title'},'Forma de pago'),
+      h('div',{className:'pay-method-row'},
+        ['transferencia','cheque','efectivo'].map(t=>
+          h('button',{key:t,className:`pay-method-btn ${tipoPago===t?'active':''}`,onClick:()=>setTipoPago(t)},
+            t==='transferencia'?'🏦 Transf.':t==='cheque'?'📋 Cheque':'💵 Efectivo'
+          )
+        )
+      ),
+      tipoPago==='transferencia'&&h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Nombre del destinatario'),
+        h('input',{className:'form-input',placeholder:'A nombre de...',value:detalle,onChange:(e)=>setDetalle(e.target.value)})
+      ),
+      tipoPago==='cheque'&&h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'N° cheque y banco'),
+        h('input',{className:'form-input',placeholder:'Ej: 00012345 - Banco Nación',value:detalle,onChange:(e)=>setDetalle(e.target.value)})
+      ),
+
+      h('button',{className:'btn-primary',
+        onClick:()=>{if(monto&&parseFloat(monto)>0){onSave(parseFloat(monto),moneda,montoPesos,tipoPago,detalle);onClose()}}
+      },'Guardar Pago'),
+      pagoActual&&!confirmDel&&h('button',{className:'btn-danger',onClick:()=>setConfirmDel(true)},'Eliminar pago'),
+      confirmDel&&h('div',{style:{marginTop:8}},
+        h('p',{style:{fontSize:13,color:'var(--red)',marginBottom:8,textAlign:'center'}},'¿Eliminar este pago?'),
+        h('div',{style:{display:'flex',gap:8}},
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setConfirmDel(false)},'Cancelar'),
+          h('button',{className:'btn-danger',style:{marginTop:0,flex:1},onClick:()=>{onDelete();onClose()}},'Eliminar')
+        )
+      ),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ─── FORM ALQUILER ─────────────────────────
+function FormAlquiler({initial,propiedades,inquilinos,onSave,onDelete,onClose,onNuevaProp,onNuevoInq}){
+  const EMPTY={propiedadId:'',inquilinoId:'',fechaInicio:new Date().toISOString().slice(0,10),
+    contrato:{tipo:'fijo',moneda:'pesos',montoBase:'',ajuste:'ninguno',iva:false,
+      tramos:[{id:uid(),mesDesde:1,mesHasta:6,montoBase:'',moneda:'pesos',ajuste:'ninguno'}]}};
+  const[d,setD]=useState(initial||EMPTY);
+  const[confirmDel,setConfirmDel]=useState(false);
+
+  const up=(path,val)=>setD(prev=>{const n=JSON.parse(JSON.stringify(prev));let o=n;const parts=path.split('.');for(let i=0;i<parts.length-1;i++)o=o[parts[i]];o[parts[parts.length-1]]=val;return n});
+  const addTramo=()=>{const last=d.contrato.tramos[d.contrato.tramos.length-1];const desde=last?last.mesHasta+1:1;setD(p=>{const n=JSON.parse(JSON.stringify(p));n.contrato.tramos.push({id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:p.contrato.moneda||'pesos',ajuste:'ninguno'});return n})};
+  const delTramo=(id)=>setD(p=>{const n=JSON.parse(JSON.stringify(p));n.contrato.tramos=n.contrato.tramos.filter(t=>t.id!==id);return n});
+  const upTramo=(id,f,v)=>setD(p=>{const n=JSON.parse(JSON.stringify(p));const t=n.contrato.tramos.find(t=>t.id===id);if(t)t[f]=v;return n});
+
+  const[subModal,setSubModal]=useState(null); // 'prop' | 'inq'
+
+  const propSel=propiedades.find(p=>p.id===d.propiedadId);
+  const valid=d.propiedadId&&d.inquilinoId&&d.fechaInicio&&(d.contrato.tipo==='fijo'?d.contrato.montoBase:d.contrato.tramos.every(t=>t.montoBase));
+
+  const handleSave=()=>{
+    if(!valid)return;
+    const data=JSON.parse(JSON.stringify(d));
+    const prop=propiedades.find(p=>p.id===data.propiedadId);
+    const inq=inquilinos.find(i=>i.id===data.inquilinoId);
+    data.nombrePropiedad=prop?.nombre||prop?.codigo||'';
+    data.nombreInquilino=inq?.nombre||'';
+    if(data.contrato.tipo==='fijo')data.contrato.montoBase=parseFloat(data.contrato.montoBase)||0;
+    else data.contrato.tramos.forEach(t=>{t.montoBase=parseFloat(t.montoBase)||0});
+    onSave(data);onClose();
+  };
+
+  if(subModal==='prop')return h(FormPropiedad,{initial:null,onSave:(p)=>{onNuevaProp(p);setSubModal(null)},onDelete:()=>{},onClose:()=>setSubModal(null)});
+  if(subModal==='inq')return h(FormInquilino,{initial:null,onSave:(i)=>{onNuevoInq(i);setSubModal(null)},onDelete:()=>{},onClose:()=>setSubModal(null)});
+
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},initial?'Editar contrato':'Nuevo contrato'),
+
+      h('div',{className:'form-group'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}},
+          h('label',{className:'form-label',style:{marginBottom:0}},'Propiedad'),
+          h('button',{onClick:()=>setSubModal('prop'),style:{background:'none',border:'none',color:'var(--blue)',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}},'+ Nueva')
+        ),
+        h('select',{className:'form-select',value:d.propiedadId,onChange:(e)=>up('propiedadId',e.target.value)},
+          h('option',{value:''},'— Seleccionar —'),
+          propiedades.filter(p=>p.activo).map(p=>h('option',{key:p.id,value:p.id},`${p.codigo} · ${p.nombre}`))
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}},
+          h('label',{className:'form-label',style:{marginBottom:0}},'Inquilino'),
+          h('button',{onClick:()=>setSubModal('inq'),style:{background:'none',border:'none',color:'var(--blue)',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}},'+ Nuevo')
+        ),
+        h('select',{className:'form-select',value:d.inquilinoId,onChange:(e)=>up('inquilinoId',e.target.value)},
+          h('option',{value:''},'— Seleccionar —'),
+          inquilinos.map(i=>h('option',{key:i.id,value:i.id},i.nombre+(i.esSociedad?' 🏢':'')))
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Inicio del contrato'),
+        h('input',{className:'form-input',type:'date',value:d.fechaInicio,onChange:(e)=>up('fechaInicio',e.target.value)})
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Tipo de contrato'),
+        h('select',{className:'form-select',value:d.contrato.tipo,onChange:(e)=>up('contrato.tipo',e.target.value)},
+          h('option',{value:'fijo'},'Monto fijo'),
+          h('option',{value:'escalonado'},'Escalonado por tramos')
+        )
+      ),
+
+      d.contrato.tipo==='fijo'&&h('div',null,
+        h('div',{className:'form-group'},
+          h('label',{className:'form-label'},'Monto base'),
+          h('div',{className:'currency-wrap'},
+            h('select',{className:'currency-select',value:d.contrato.moneda,onChange:(e)=>up('contrato.moneda',e.target.value)},
+              h('option',{value:'pesos'},'$ Pesos'),
+              h('option',{value:'dolar'},'U$D Dólar'),
+              h('option',{value:'nafta'},'L Nafta')
+            ),
+            h('input',{className:'currency-input',type:'number',inputMode:'numeric',placeholder:'0',value:d.contrato.montoBase,onChange:(e)=>up('contrato.montoBase',e.target.value)})
+          )
+        ),
+        h('div',{className:'form-group'},
+          h('label',{className:'form-label'},'Tipo de ajuste'),
+          h('select',{className:'form-select',value:d.contrato.ajuste,onChange:(e)=>up('contrato.ajuste',e.target.value)},
+            h('option',{value:'ninguno'},'Sin ajuste'),h('option',{value:'ipc'},'IPC')
+          )
+        )
+      ),
+
+      d.contrato.tipo==='escalonado'&&h('div',null,
+        h('p',{className:'section-title'},'Tramos'),
+        d.contrato.tramos.map((t,i)=>h('div',{key:t.id,className:'tramo-card'},
+          h('div',{className:'tramo-header'},
+            h('span',{style:{fontWeight:600,fontSize:14}},'Tramo '+(i+1)),
+            d.contrato.tramos.length>1&&h('button',{style:{background:'var(--red-bg)',color:'var(--red-text)',padding:'3px 9px',borderRadius:7,fontSize:12,fontWeight:600},onClick:()=>delTramo(t.id)},'✕')
+          ),
+          h('div',{className:'form-row'},
+            h('div',{className:'form-group'},h('label',{className:'form-label'},'Mes desde'),h('input',{className:'form-input',type:'number',min:1,value:t.mesDesde,onChange:(e)=>upTramo(t.id,'mesDesde',parseInt(e.target.value)||1)})),
+            h('div',{className:'form-group'},h('label',{className:'form-label'},'Mes hasta'),h('input',{className:'form-input',type:'number',min:1,value:t.mesHasta,onChange:(e)=>upTramo(t.id,'mesHasta',parseInt(e.target.value)||12)}))
+          ),
+          h('div',{className:'form-group'},
+            h('label',{className:'form-label'},'Monto'),
+            h('div',{className:'currency-wrap'},
+              h('select',{className:'currency-select',value:t.moneda||'pesos',onChange:(e)=>upTramo(t.id,'moneda',e.target.value)},
+                h('option',{value:'pesos'},'$ Pesos'),h('option',{value:'dolar'},'U$D'),h('option',{value:'nafta'},'L Nafta')
+              ),
+              h('input',{className:'currency-input',type:'number',inputMode:'numeric',placeholder:'0',value:t.montoBase,onChange:(e)=>upTramo(t.id,'montoBase',e.target.value)})
+            )
+          ),
+          h('div',{className:'form-group'},h('label',{className:'form-label'},'Ajuste'),
+            h('select',{className:'form-select',value:t.ajuste,onChange:(e)=>upTramo(t.id,'ajuste',e.target.value)},
+              h('option',{value:'ninguno'},'Sin ajuste'),h('option',{value:'ipc'},'IPC')
+            )
+          )
+        )),
+        h('button',{className:'btn-add',onClick:addTramo},'+ Agregar tramo')
+      ),
+
+      h('div',{className:'form-check'},
+        h('input',{type:'checkbox',id:'iva_check',checked:d.contrato.iva,onChange:(e)=>up('contrato.iva',e.target.checked)}),
+        h('label',{htmlFor:'iva_check',style:{fontSize:14}},'Aplicar IVA 21% al monto')
+      ),
+
+      h('div',{style:{height:12}}),
+      h('button',{className:'btn-primary',disabled:!valid,style:{opacity:valid?1:.5},onClick:handleSave},'Guardar contrato'),
+      initial&&!confirmDel&&h('button',{className:'btn-danger',onClick:()=>setConfirmDel(true)},'Eliminar contrato'),
+      confirmDel&&h('div',{style:{marginTop:8}},
+        h('p',{style:{fontSize:13,color:'var(--red)',marginBottom:8,textAlign:'center'}},'¿Eliminar contrato y todos sus pagos?'),
+        h('div',{style:{display:'flex',gap:8}},
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setConfirmDel(false)},'Cancelar'),
+          h('button',{className:'btn-danger',style:{marginTop:0,flex:1},onClick:()=>{onDelete();onClose()}},'Eliminar')
+        )
+      ),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ─── HISTORIAL ─────────────────────────────
+function Historial({alquiler,pagos,variables,inquilinos,onClose,onRegistrar}){
+  const meses=generarMeses(alquiler.fechaInicio);
+  const mesActualKey=mesKey(NOW.getFullYear(),NOW.getMonth());
+  const inq=inquilinos.find(i=>i.id===alquiler.inquilinoId);
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},alquiler.nombrePropiedad||'Historial'),
+      h('p',{style:{fontSize:14,color:'var(--text2)',marginBottom:14}},inq?.nombre||alquiler.nombreInquilino),
+      meses.map(m=>{
+        const vm=variables[m.key]||{};
+        const montoObj=calcularMonto(alquiler,m.year,m.month,variables);
+        const esperadoPesos=montoAPesos(montoObj,vm);
+        const p=pagos[`${alquiler.id}_${m.key}`];
+        const est=estadoPago(alquiler.id,m.key,pagos,esperadoPesos);
+        const esActual=m.key===mesActualKey;
+        return h('div',{key:m.key,className:'month-row',style:{opacity:montoObj==null?.4:1}},
+          h('div',{style:{flex:1}},
+            h('div',{style:{fontSize:14,fontWeight:esActual?700:500}},mesLabel(m.year,m.month)+(esActual?' ◂':'')),
+            h('div',{style:{marginTop:3}},h(Badge,{estado:est.estado})),
+            p&&h('div',{style:{fontSize:12,color:'var(--text2)',marginTop:2}},
+              (p.tipoPago==='transferencia'?'🏦':p.tipoPago==='cheque'?'📋':'💵')+' '+(p.tipoPago||'')+(p.detallePago?' · '+p.detallePago:'')
+            )
+          ),
+          h('div',{style:{textAlign:'right'}},
+            h('div',{style:{fontSize:14,fontWeight:700}},montoObj?fmtNum(montoObj.monto,montoObj.moneda):'—'),
+            p&&h('div',{style:{fontSize:12,color:'var(--text2)'}},`Pagado: ${fmtNum(p.monto,p.moneda)}`),
+            h('button',{style:{marginTop:5,background:'var(--blue-bg)',color:'var(--blue)',border:'none',padding:'5px 11px',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer'},
+              onClick:()=>onRegistrar(m,montoObj,vm,p)},p?'Editar':'Pagar')
+          )
+        );
+      }),
+      h('button',{className:'btn-secondary',style:{marginTop:14},onClick:onClose},'Cerrar')
+    )
+  );
+}
+
+// ─── FORM INQUILINO ────────────────────────
+function FormInquilino({initial,onSave,onDelete,onClose}){
+  const[d,setD]=useState(initial||{nombre:'',esSociedad:false,cuit:'',contactoPagos:'',telefonoContacto:'',telefono:'',email:'',dni:'',obs:''});
+  const[confirmDel,setConfirmDel]=useState(false);
+  const up=(f,v)=>setD(p=>({...p,[f]:v}));
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},initial?'Editar inquilino':'Nuevo inquilino'),
+
+      h('div',{className:'form-check'},
+        h('input',{type:'checkbox',id:'es_sociedad',checked:d.esSociedad,onChange:(e)=>up('esSociedad',e.target.checked)}),
+        h('label',{htmlFor:'es_sociedad',style:{fontSize:14,fontWeight:600}},'Es una sociedad / empresa')
+      ),
+
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},d.esSociedad?'Razón social':'Nombre completo'),
+        h('input',{className:'form-input',placeholder:d.esSociedad?'Ej: Inversiones SA':'Nombre y apellido',value:d.nombre,onChange:(e)=>up('nombre',e.target.value)})
+      ),
+
+      d.esSociedad&&h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'CUIT'),
+        h('input',{className:'form-input',placeholder:'Ej: 30-12345678-9',value:d.cuit||'',onChange:(e)=>up('cuit',e.target.value)})
+      ),
+
+      d.esSociedad&&h('div',null,
+        h('div',{style:{background:'var(--blue-bg)',borderRadius:10,padding:'10px 12px',marginBottom:14}},
+          h('p',{style:{fontSize:12,fontWeight:700,color:'var(--blue-text)',marginBottom:8}},'CONTACTO DE PAGOS'),
+          h('p',{style:{fontSize:12,color:'var(--blue-text)',marginBottom:10}},'Persona física con quien tratás los pagos (se usa en los mensajes de WhatsApp)'),
+          h('div',{className:'form-group',style:{marginBottom:10}},
+            h('label',{className:'form-label'},'Nombre del contacto'),
+            h('input',{className:'form-input',placeholder:'Ej: Juan Pérez',value:d.contactoPagos||'',onChange:(e)=>up('contactoPagos',e.target.value)})
+          ),
+          h('div',{className:'form-group',style:{marginBottom:0}},
+            h('label',{className:'form-label'},'WhatsApp del contacto'),
+            h('input',{className:'form-input',type:'tel',placeholder:'Ej: 381 4123456',value:d.telefonoContacto||'',onChange:(e)=>up('telefonoContacto',e.target.value)})
+          )
+        )
+      ),
+
+      !d.esSociedad&&h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'DNI'),
+        h('input',{className:'form-input',placeholder:'Número de DNI',value:d.dni||'',onChange:(e)=>up('dni',e.target.value)})
+      ),
+
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Teléfono / WhatsApp'),h('input',{className:'form-input',type:'tel',placeholder:'Ej: 381 4123456',value:d.telefono,onChange:(e)=>up('telefono',e.target.value)}),h('p',{className:'form-hint'},'Con código de área, sin el 0 ni el 15')),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Email'),h('input',{className:'form-input',type:'email',placeholder:'email@ejemplo.com',value:d.email,onChange:(e)=>up('email',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Observaciones'),h('textarea',{className:'form-input',rows:2,value:d.obs,onChange:(e)=>up('obs',e.target.value)})),
+      h('button',{className:'btn-primary',disabled:!d.nombre.trim(),style:{opacity:d.nombre.trim()?1:.5},onClick:()=>{if(d.nombre.trim()){onSave(d);onClose()}}},'Guardar'),
+      initial&&!confirmDel&&h('button',{className:'btn-danger',onClick:()=>setConfirmDel(true)},'Eliminar inquilino'),
+      confirmDel&&h('div',{style:{marginTop:8}},
+        h('p',{style:{fontSize:13,color:'var(--red)',marginBottom:8,textAlign:'center'}},'¿Eliminar este inquilino?'),
+        h('div',{style:{display:'flex',gap:8}},
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setConfirmDel(false)},'Cancelar'),
+          h('button',{className:'btn-danger',style:{marginTop:0,flex:1},onClick:()=>{onDelete();onClose()}},'Eliminar')
+        )
+      ),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ─── FORM PROPIEDAD ────────────────────────
+function FormPropiedad({initial,onSave,onDelete,onClose}){
+  const TIPOS=['local','depto','terreno','otro'];
+  const[d,setD]=useState(initial||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',ambientes:'',obs:'',activo:true});
+  const[confirmDel,setConfirmDel]=useState(false);
+  const up=(f,v)=>setD(p=>({...p,[f]:v}));
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},initial?'Editar propiedad':'Nueva propiedad'),
+      h('div',{className:'form-row'},
+        h('div',{className:'form-group'},h('label',{className:'form-label'},'Código'),h('input',{className:'form-input',placeholder:'Ej: HL01',value:d.codigo,onChange:(e)=>up('codigo',e.target.value)})),
+        h('div',{className:'form-group'},h('label',{className:'form-label'},'Tipo'),h('select',{className:'form-select',value:d.tipo,onChange:(e)=>up('tipo',e.target.value)},TIPOS.map(t=>h('option',{key:t,value:t},t.charAt(0).toUpperCase()+t.slice(1)))))
+      ),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Nombre / Identificación'),h('input',{className:'form-input',placeholder:'Ej: Punto Heller L1',value:d.nombre,onChange:(e)=>up('nombre',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Dirección completa'),h('input',{className:'form-input',placeholder:'Dirección',value:d.direccion,onChange:(e)=>up('direccion',e.target.value)})),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Ciudad / Localidad'),h('input',{className:'form-input',value:d.ciudad,onChange:(e)=>up('ciudad',e.target.value)})),
+      h('div',{className:'form-row'},
+        h('div',{className:'form-group'},h('label',{className:'form-label'},'Superficie m²'),h('input',{className:'form-input',type:'number',placeholder:'0',value:d.superficie,onChange:(e)=>up('superficie',e.target.value)})),
+        h('div',{className:'form-group'},h('label',{className:'form-label'},'Ambientes'),h('input',{className:'form-input',type:'number',placeholder:'0',value:d.ambientes,onChange:(e)=>up('ambientes',e.target.value)}))
+      ),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Observaciones'),h('textarea',{className:'form-input',rows:3,value:d.obs,onChange:(e)=>up('obs',e.target.value)})),
+      h('button',{className:'btn-primary',disabled:!d.nombre.trim(),style:{opacity:d.nombre.trim()?1:.5},onClick:()=>{if(d.nombre.trim()){onSave(d);onClose()}}},'Guardar'),
+      initial&&!confirmDel&&h('button',{className:'btn-danger',onClick:()=>setConfirmDel(true)},'Eliminar propiedad'),
+      confirmDel&&h('div',{style:{marginTop:8}},
+        h('p',{style:{fontSize:13,color:'var(--red)',marginBottom:8,textAlign:'center'}},'¿Eliminar esta propiedad?'),
+        h('div',{style:{display:'flex',gap:8}},
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setConfirmDel(false)},'Cancelar'),
+          h('button',{className:'btn-danger',style:{marginTop:0,flex:1},onClick:()=>{onDelete();onClose()}},'Eliminar')
+        )
+      ),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ─── FORM GASTO ────────────────────────────
+function FormGasto({propiedades,onSave,onClose}){
+  const[d,setD]=useState({propiedadId:'',tipo:'expensas',monto:'',moneda:'pesos',quien:'inquilino',estado:'pendiente',desc:''});
+  const up=(f,v)=>setD(p=>({...p,[f]:v}));
+  const valid=d.propiedadId&&d.monto;
+  return h('div',{className:'modal-overlay',onClick:(e)=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modal-title'},'Registrar Gasto'),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Propiedad'),
+        h('select',{className:'form-select',value:d.propiedadId,onChange:(e)=>up('propiedadId',e.target.value)},
+          h('option',{value:''},'— Seleccionar —'),
+          propiedades.filter(p=>p.activo).map(p=>h('option',{key:p.id,value:p.id},`${p.codigo} · ${p.nombre}`))
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Tipo de gasto'),
+        h('select',{className:'form-select',value:d.tipo,onChange:(e)=>up('tipo',e.target.value)},
+          h('option',{value:'expensas'},'Expensas'),
+          h('option',{value:'arreglo'},'Arreglo / Reparación'),
+          h('option',{value:'servicio'},'Servicio (luz/gas/agua)'),
+          h('option',{value:'impuesto'},'Impuesto / Tasa'),
+          h('option',{value:'otro'},'Otro')
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Monto'),
+        h('div',{className:'currency-wrap'},
+          h('select',{className:'currency-select',value:d.moneda,onChange:(e)=>up('moneda',e.target.value)},
+            h('option',{value:'pesos'},'$ Pesos'),h('option',{value:'dolar'},'U$D')
+          ),
+          h('input',{className:'currency-input',type:'number',inputMode:'numeric',placeholder:'0',value:d.monto,onChange:(e)=>up('monto',e.target.value)})
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'¿Quién paga?'),
+        h('select',{className:'form-select',value:d.quien,onChange:(e)=>up('quien',e.target.value)},
+          h('option',{value:'inquilino'},'Inquilino'),
+          h('option',{value:'propietario'},'Propietario')
+        )
+      ),
+      h('div',{className:'form-group'},
+        h('label',{className:'form-label'},'Estado'),
+        h('select',{className:'form-select',value:d.estado,onChange:(e)=>up('estado',e.target.value)},
+          h('option',{value:'pendiente'},'Pendiente'),h('option',{value:'pagado'},'Pagado')
+        )
+      ),
+      h('div',{className:'form-group'},h('label',{className:'form-label'},'Descripción'),h('input',{className:'form-input',placeholder:'Detalle opcional',value:d.desc,onChange:(e)=>up('desc',e.target.value)})),
+      h('button',{className:'btn-primary',disabled:!valid,style:{opacity:valid?1:.5},onClick:()=>{if(valid){onSave({...d,monto:parseFloat(d.monto),fecha:new Date().toISOString().slice(0,10)});onClose()}}},'Guardar gasto'),
+      h('button',{className:'btn-secondary',style:{marginTop:8},onClick:onClose},'Cancelar')
+    )
+  );
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+
+// ─── DASHBOARD ─────────────────────────────
+function TabDashboard({alquileres,pagos,variables,propiedades,inquilinos,setModal}){
+  const mesActualKey=mesKey(NOW.getFullYear(),NOW.getMonth());
+  const vm=variables[mesActualKey]||{};
+
+  const rows=alquileres.filter(a=>a.activo!==false).map(a=>{
+    const montoObj=calcularMonto(a,NOW.getFullYear(),NOW.getMonth(),variables);
+    const esperadoPesos=montoAPesos(montoObj,vm);
+    const est=estadoPago(a.id,mesActualKey,pagos,esperadoPesos);
+    const inq=inquilinos.find(i=>i.id===a.inquilinoId);
+    return{a,montoObj,est,inq};
+  });
+
+  const totalEsp=rows.reduce((s,r)=>s+(r.est.esperado||0),0);
+  const totalCob=rows.reduce((s,r)=>s+r.est.pagado,0);
+  const pagados=rows.filter(r=>r.est.estado==='pagado').length;
+  const pendientes=rows.filter(r=>r.est.estado==='pendiente').length;
+  const parciales=rows.filter(r=>r.est.estado==='parcial').length;
+
+  return h('div',{className:'content'},
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
+      h('div',null,
+        h('p',{style:{fontSize:12,color:'var(--text2)'}},'Mes actual'),
+        h('p',{style:{fontSize:17,fontWeight:800}},mesLabel(NOW.getFullYear(),NOW.getMonth()))
+      ),
+      rows.length>0&&h('div',{style:{textAlign:'right'}},
+        h('p',{style:{fontSize:11,color:'var(--text2)'}},'Cobrado / Esperado'),
+        h('p',{style:{fontSize:14,fontWeight:700}},fmtNum(totalCob,'pesos')+' / '+fmtNum(totalEsp,'pesos'))
+      )
+    ),
+
+    rows.length>0&&h('div',{className:'stats-row'},
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--green)'}},pagados),h('div',{className:'stat-label'},'Pagados')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--yellow)'}},parciales),h('div',{className:'stat-label'},'Parciales')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--red)'}},pendientes),h('div',{className:'stat-label'},'Pendientes'))
+    ),
+
+    rows.length===0&&h('div',{className:'empty'},
+      h('div',{className:'empty-icon'},'🏠'),
+      h('div',{className:'empty-msg'},'Sin contratos activos'),
+      h('div',{className:'empty-sub'},'Andá a "Contratos" para agregar uno')
+    ),
+
+    rows.map(({a,montoObj,est,inq})=>{
+      const pagoActual=pagos[`${a.id}_${mesActualKey}`];
+      const waNombre=inq?(inq.esSociedad&&inq.contactoPagos?inq.contactoPagos:inq.nombre):'';
+      const waTel=inq?(inq.esSociedad&&inq.telefonoContacto?inq.telefonoContacto:inq.telefono):'';
+      const waMsg=waTel?`Hola ${waNombre}! Te recuerdo el vencimiento de ${a.nombrePropiedad||''} para ${mesLabel(NOW.getFullYear(),NOW.getMonth())}. Monto: ${montoObj?fmtNum(montoObj.monto,montoObj.moneda):'—'}. Gracias!`:null;
+      return h('div',{key:a.id,className:'prop-card'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}},
+          h('div',null,
+            h('div',{className:'prop-name'},a.nombrePropiedad||a.propiedadId),
+            h('div',{className:'prop-sub'},inq?.nombre||a.nombreInquilino||'—')
+          ),
+          h(Badge,{estado:est.estado})
+        ),
+        h('div',{style:{marginBottom:8}},
+          h('span',{className:`tag tag-${a.contrato?.tipo}`},a.contrato?.tipo==='escalonado'?'Escalonado':'Fijo'),
+          montoObj&&h('span',{className:`tag tag-${montoObj.moneda}`},montoObj.moneda),
+          montoObj?.iva&&h('span',{className:'tag',style:{background:'#f3e8ff',color:'#581c87'}},'IVA')
+        ),
+        h('div',{className:'prop-amounts'},
+          h('div',{className:'amount-box'},h('div',{className:'amount-label'},'Esperado'),h('div',{className:'amount-val'},montoObj?fmtNum(montoObj.monto,montoObj.moneda):'—')),
+          h('div',{className:'amount-box'},h('div',{className:'amount-label'},'Pagado (ARS)'),h('div',{className:`amount-val ${est.pagado===0?'red':est.pagado>=est.esperado?'green':'yellow'}`},fmtNum(est.pagado,'pesos'))),
+          h('div',{className:'amount-box'},
+            h('div',{className:'amount-label'},'Diferencia'),
+            h('div',{className:`amount-val ${est.diferencia>=0?'green':'red'}`},
+              est.diferencia===0?'—':(est.diferencia>0?'+':'')+fmtNum(Math.abs(est.diferencia),'pesos')
+            )
+          )
+        ),
+        pagoActual&&h('div',{className:'pago-detail'},
+          h('div',{className:'pago-detail-row'},
+            h('span',{style:{color:'var(--text2)'}},pagoActual.tipoPago==='transferencia'?'🏦 Transferencia':pagoActual.tipoPago==='cheque'?'📋 Cheque':'💵 Efectivo'),
+            h('span',pagoActual.fecha)
+          ),
+          pagoActual.detallePago&&h('div',{className:'pago-detail-row'},h('span',{style:{color:'var(--text2)'}},'Detalle'),h('span',pagoActual.detallePago))
+        ),
+        h('div',{className:'prop-actions'},
+          h('button',{className:'btn-pay',
+            onClick:()=>setModal({type:'pago',alquiler:a,mes:{year:NOW.getFullYear(),month:NOW.getMonth(),key:mesActualKey},montoEsperadoObj:montoObj,vm,pagoActual})},
+            est.estado==='pagado'?'✓ Registrado':'Registrar pago'
+          ),
+          waMsg&&h('button',{className:'btn-wa',onClick:()=>window.open(waURL(waTel,waMsg),'_blank')},'💬'),
+          h('button',{className:'btn-sm',onClick:()=>setModal({type:'hist',alquiler:a})},'📋'),
+          h('button',{className:'btn-sm',onClick:()=>setModal({type:'alq',data:a})},'✎')
+        )
+      );
+    })
+  );
+}
+
+// ─── PROPIEDADES ───────────────────────────
+
+// ─── FORM NUEVO GRUPO ─────────────────────────
+function FormNuevoGrupo({onSave}){
+  const[nombre,setNombre]=useState('');
+  const[desc,setDesc]=useState('');
+  return h('div',null,
+    h('div',{className:'form-group'},h('label',{className:'form-label'},'Nombre del grupo'),h('input',{className:'form-input',placeholder:'Ej: Edificio San Martín 123',value:nombre,onChange:(e)=>setNombre(e.target.value)})),
+    h('div',{className:'form-group'},h('label',{className:'form-label'},'Descripción (opcional)'),h('input',{className:'form-input',placeholder:'Ej: 10 departamentos',value:desc,onChange:(e)=>setDesc(e.target.value)})),
+    h('button',{className:'btn-primary',disabled:!nombre.trim(),style:{opacity:nombre.trim()?1:.5,marginTop:4},onClick:()=>{if(nombre.trim()){onSave({nombre:nombre.trim(),descripcion:desc.trim()});setNombre('');setDesc('')}}},'+ Crear grupo')
+  );
+}
+
+function TabPropiedades({propiedades,alquileres,grupos,setModal,onAddGrupo,onDelGrupo}){
+  const[subTab,setSubTab]=useState('props');
+  if(subTab==='grupos') return h('div',{className:'content'},
+    h('div',{className:'tab-sub'},
+      h('button',{className:'tab-sub-btn',onClick:()=>setSubTab('props')},'← Propiedades'),
+      h('button',{className:'tab-sub-btn active'},'🏢 Grupos / Edificios')
+    ),
+    h('p',{className:'section-title'},'Grupos de propiedades'),
+    h('div',{className:'alert alert-info'},'Cada grupo agrupa propiedades para filtrar y liquidar expensas.'),
+    grupos.map(g=>{
+      const cant=propiedades.filter(p=>p.grupoId===g.id).length;
+      return h('div',{key:g.id,className:'card'},
+        h('div',{className:'card-row'},
+          h('div',null,h('div',{style:{fontWeight:700}},g.nombre),h('div',{style:{fontSize:12,color:'var(--text2)'}},cant+' propiedades'+(g.descripcion?' · '+g.descripcion:''))),
+          h('button',{onClick:()=>{if(cant===0&&window.confirm('¿Eliminar grupo?'))onDelGrupo(g.id)},style:{background:'var(--red-bg)',color:'var(--red-text)',border:'none',padding:'5px 10px',borderRadius:7,fontSize:12,cursor:'pointer',opacity:cant>0?0.4:1},disabled:cant>0},cant>0?'En uso':'✕')
+        )
+      );
+    }),
+    h('div',{className:'card',style:{marginTop:8}},
+      h('p',{className:'section-title',style:{marginTop:0}},'Nuevo grupo'),
+      h(FormNuevoGrupo,{onSave:onAddGrupo})
+    ),
+    h('div',{style:{height:70}})
+  );
+
+  const[search,setSearch]=useState('');
+  const filtered=propiedades.filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.codigo.toLowerCase().includes(search.toLowerCase())||p.ciudad.toLowerCase().includes(search.toLowerCase()));
+  const tipoTag={local:'tag-local',depto:'tag-depto',terreno:'tag-terreno',otro:'tag-otro'};
+  const tipoLabel={local:'Local',depto:'Depto',terreno:'Terreno',otro:'Otro'};
+  return h('div',{className:'content'},
+    h('div',{className:'tab-sub'},
+      h('button',{className:`tab-sub-btn ${subTab==='props'?'active':''}`,onClick:()=>setSubTab('props')},'🏠 Propiedades'),
+      h('button',{className:`tab-sub-btn ${subTab==='grupos'?'active':''}`,onClick:()=>setSubTab('grupos')},'🏢 Grupos')
+    ),
+    h('p',{className:'section-title'},`${propiedades.length} propiedades`),
+    h('input',{className:'search-input',placeholder:'Buscar por nombre, código o ciudad...',value:search,onChange:(e)=>setSearch(e.target.value)}),
+    filtered.length===0&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔍'),h('div',{className:'empty-msg'},'Sin resultados')),
+    filtered.map(p=>{
+      const alqActivo=alquileres.find(a=>a.propiedadId===p.id&&a.activo!==false);
+      return h('div',{key:p.id,className:'proplist-card'},
+        h('div',{className:'proplist-header'},
+          h('div',null,
+            h('div',{className:'proplist-id'},p.codigo),
+            h('div',{className:'proplist-name'},p.nombre),
+            h('div',{className:'proplist-addr'},p.direccion+(p.ciudad?` · ${p.ciudad}`:'')),
+            p.superficie&&h('div',{style:{fontSize:12,color:'var(--text2)',marginTop:2}},`${p.superficie} m² · ${p.ambientes} amb.`)
+          ),
+          h('span',{className:`tag ${tipoTag[p.tipo]||'tag-otro'}`},tipoLabel[p.tipo]||p.tipo)
+        ),
+        p.obs&&h('div',{style:{fontSize:12,color:'var(--text2)',marginTop:4,borderTop:'1px solid var(--border)',paddingTop:6}},p.obs),
+        h('div',{style:{marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          alqActivo?h('span',{style:{fontSize:12,background:'var(--green-bg)',color:'var(--green-text)',padding:'2px 8px',borderRadius:10,fontWeight:600}},'● En alquiler')
+            :h('span',{style:{fontSize:12,background:'var(--gray-bg)',color:'var(--gray)',padding:'2px 8px',borderRadius:10}},'Disponible'),
+          h('button',{style:{background:'none',border:'none',color:'var(--blue)',fontSize:13,fontWeight:600,cursor:'pointer'},onClick:()=>setModal({type:'prop',data:p})},'Editar')
+        )
+      );
+    }),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ─── INQUILINOS ────────────────────────────
+function TabInquilinos({inquilinos,alquileres,setModal}){
+  const[search,setSearch]=useState('');
+  const filtered=inquilinos.filter(i=>!search||i.nombre.toLowerCase().includes(search.toLowerCase()));
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},`${inquilinos.length} inquilinos`),
+    h('input',{className:'search-input',placeholder:'Buscar inquilino...',value:search,onChange:(e)=>setSearch(e.target.value)}),
+    filtered.length===0&&inquilinos.length===0&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'👤'),h('div',{className:'empty-msg'},'Sin inquilinos'),h('div',{className:'empty-sub'},'Tocá + para agregar')),
+    filtered.map(inq=>{
+      const alqActivos=alquileres.filter(a=>a.inquilinoId===inq.id&&a.activo!==false);
+      return h('div',{key:inq.id,className:'inq-card'},
+        h('div',{className:'inq-avatar'},(inq.nombre||'?')[0].toUpperCase()),
+        h('div',{className:'inq-info'},
+          h('div',{className:'inq-name'},inq.nombre),
+          inq.esSociedad&&inq.cuit&&h('div',{className:'inq-detail'},'🏢 CUIT: '+inq.cuit),
+          inq.esSociedad&&inq.contactoPagos&&h('div',{className:'inq-detail',style:{fontWeight:600,color:'var(--text)'}},'👤 '+inq.contactoPagos+(inq.telefonoContacto?' · '+inq.telefonoContacto:'')),
+          !inq.esSociedad&&inq.telefono&&h('div',{className:'inq-detail'},'📱 '+inq.telefono),
+          inq.email&&h('div',{className:'inq-detail'},'✉ '+inq.email),
+          alqActivos.length>0&&h('div',{style:{fontSize:12,color:'var(--green)',fontWeight:600,marginTop:3}},alqActivos.length+' contrato'+(alqActivos.length>1?'s':'')+ ' activo'+(alqActivos.length>1?'s':''))
+        ),
+        h('div',{className:'inq-actions'},
+          inq.telefono&&h('a',{href:`https://wa.me/${inq.telefono.replace(/\D/g,'')}`,target:'_blank',style:{background:'#25d366',color:'#fff',padding:'8px 10px',borderRadius:8,fontSize:14,textDecoration:'none'}},'💬'),
+          h('button',{className:'btn-sm',onClick:()=>setModal({type:'inq',data:inq})},'✎')
+        )
+      );
+    }),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ─── CONTRATOS ─────────────────────────────
+function TabContratos({alquileres,propiedades,inquilinos,setModal}){
+  const activos=alquileres.filter(a=>a.activo!==false);
+  const inactivos=alquileres.filter(a=>a.activo===false);
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},`${activos.length} contratos activos`),
+    activos.length===0&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'📄'),h('div',{className:'empty-msg'},'Sin contratos'),h('div',{className:'empty-sub'},'Tocá + para crear uno')),
+    activos.map(a=>{
+      const inq=inquilinos.find(i=>i.id===a.inquilinoId);
+      return h('div',{key:a.id,className:'card'},
+        h('div',{className:'card-row'},
+          h('div',null,
+            h('div',{style:{fontWeight:700,fontSize:15}},a.nombrePropiedad||a.propiedadId),
+            h('div',{style:{fontSize:13,color:'var(--text2)'}},inq?.nombre||a.nombreInquilino||'—')
+          ),
+          h('div',{style:{textAlign:'right'}},
+            h('div',{style:{fontSize:11,color:'var(--text2)'}},a.fechaInicio),
+            h('span',{className:`tag tag-${a.contrato?.tipo}`},a.contrato?.tipo==='escalonado'?'Escalonado':'Fijo')
+          )
+        ),
+        a.contrato&&h('div',{className:'card-row'},
+          h('span',{style:{fontSize:13,color:'var(--text2)'}},'Moneda / Ajuste'),
+          h('span',{style:{fontSize:13}},
+            h('span',{className:`tag tag-${a.contrato.moneda}`},a.contrato.moneda),
+            a.contrato.ajuste&&a.contrato.ajuste!=='ninguno'&&h('span',{className:'tag tag-ajuste',style:{background:'var(--yellow-bg)',color:'var(--yellow-text)'}},a.contrato.ajuste),
+            a.contrato.iva&&h('span',{className:'tag',style:{background:'#f3e8ff',color:'#581c87'}},'IVA 21%')
+          )
+        ),
+        h('div',{style:{display:'flex',gap:6,marginTop:8}},
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setModal({type:'alq',data:a})},'Editar'),
+          h('button',{className:'btn-secondary',style:{flex:1},onClick:()=>setModal({type:'hist',alquiler:a})},'Ver historial')
+        )
+      );
+    }),
+    inactivos.length>0&&h('div',null,
+      h('p',{className:'section-title'},'Contratos finalizados'),
+      inactivos.map(a=>h('div',{key:a.id,className:'card',style:{opacity:.6}},
+        h('div',{className:'card-row'},h('span',{style:{fontWeight:600}},a.nombrePropiedad||a.propiedadId),h('span',{style:{fontSize:12,color:'var(--text2)'}},a.nombreInquilino||'—'))
+      ))
+    ),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ─── VARIABLES ─────────────────────────────
+function TabVariables({variables,setVar}){
+  const meses=[];
+  for(let i=-1;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mesKey(d.getFullYear(),d.getMonth())})}
+  const fields=[{id:'dolar',label:'Dólar ($ por U$D)',ph:'Ej: 1200'},{id:'nafta',label:'Nafta ($ por litro)',ph:'Ej: 950'},{id:'ipc',label:'IPC variación (%)',ph:'Ej: 4.5'}];
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},'Variables mensuales'),
+    h('div',{className:'alert alert-info'},'Cargá una vez por mes. Se aplican a todos los contratos automáticamente.'),
+    meses.map(m=>{
+      const v=variables[m.key]||{};
+      const esActual=m.key===mesKey(NOW.getFullYear(),NOW.getMonth());
+      return h('div',{key:m.key,className:'var-card',style:{border:esActual?'2px solid var(--blue)':''}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+          h('span',{style:{fontWeight:700,fontSize:15}},mesLabel(m.year,m.month)),
+          esActual&&h('span',{style:{fontSize:11,background:'var(--blue-bg)',color:'var(--blue)',padding:'2px 8px',borderRadius:20,fontWeight:600}},'Actual')
+        ),
+        fields.map(f=>h('div',{key:f.id,className:'var-row'},
+          h('span',{className:'var-label'},f.label),
+          h('input',{className:'var-input',type:'number',inputMode:'decimal',placeholder:f.ph,value:v[f.id]||'',onChange:(e)=>setVar(m.key,f.id,e.target.value)})
+        ))
+      );
+    })
+  );
+}
+
+// ─── GASTOS ────────────────────────────────
+function TabGastos({gastos,propiedades,setModal,delGasto}){
+  const[filtro,setFiltro]=useState('todos');
+  const filtered=gastos.filter(g=>filtro==='todos'||g.quien===filtro||g.estado===filtro);
+  const totalInq=gastos.filter(g=>g.quien==='inquilino').reduce((s,g)=>s+g.monto,0);
+  const totalProp=gastos.filter(g=>g.quien==='propietario').reduce((s,g)=>s+g.monto,0);
+  const tipoIcon={expensas:'🏢',arreglo:'🔧',servicio:'💡',impuesto:'📋',otro:'📌'};
+  return h('div',{className:'content'},
+    h('div',{className:'stats-row'},
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{fontSize:16}},fmtNum(totalInq,'pesos')),h('div',{className:'stat-label'},'A cargo inquilino')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{fontSize:16}},fmtNum(totalProp,'pesos')),h('div',{className:'stat-label'},'A cargo propietario'))
+    ),
+    h('div',{style:{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}},
+      ['todos','inquilino','propietario','pendiente','pagado'].map(f=>
+        h('button',{key:f,onClick:()=>setFiltro(f),style:{padding:'5px 11px',borderRadius:20,border:'1.5px solid',borderColor:filtro===f?'var(--blue)':'var(--border)',background:filtro===f?'var(--blue-bg)':'#fff',color:filtro===f?'var(--blue)':'var(--text2)',fontSize:12,fontWeight:600}},f.charAt(0).toUpperCase()+f.slice(1))
+      )
+    ),
+    gastos.length===0&&h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔧'),h('div',{className:'empty-msg'},'Sin gastos registrados')),
+    filtered.map(g=>{
+      const prop=propiedades.find(p=>p.id===g.propiedadId);
+      return h('div',{key:g.id,className:'gasto-card'},
+        h('div',{className:'gasto-row'},
+          h('div',{style:{flex:1}},
+            h('div',{style:{fontWeight:700,fontSize:14}},(tipoIcon[g.tipo]||'📌')+' '+(g.tipo.charAt(0).toUpperCase()+g.tipo.slice(1))),
+            h('div',{style:{fontSize:12,color:'var(--text2)',marginTop:2}},prop?.nombre||g.propiedadId),
+            g.desc&&h('div',{style:{fontSize:12,color:'var(--text2)'}},'→ '+g.desc)
+          ),
+          h('div',{style:{textAlign:'right'}},
+            h('div',{style:{fontSize:15,fontWeight:700}},fmtNum(g.monto,g.moneda||'pesos')),
+            h('div',{style:{fontSize:11,marginTop:2}},
+              h('span',{style:{background:g.quien==='inquilino'?'var(--blue-bg)':'var(--yellow-bg)',color:g.quien==='inquilino'?'var(--blue-text)':'var(--yellow-text)',padding:'1px 7px',borderRadius:10,fontSize:11,fontWeight:600}},g.quien),
+              ' ',
+              h('span',{style:{background:g.estado==='pagado'?'var(--green-bg)':'var(--red-bg)',color:g.estado==='pagado'?'var(--green-text)':'var(--red-text)',padding:'1px 7px',borderRadius:10,fontSize:11,fontWeight:600}},g.estado)
+            ),
+            h('div',{style:{fontSize:11,color:'var(--text2)',marginTop:3}},g.fecha),
+            h('button',{onClick:()=>delGasto(g.id),style:{marginTop:4,background:'var(--red-bg)',color:'var(--red-text)',border:'none',padding:'3px 9px',borderRadius:7,fontSize:12,cursor:'pointer'}},'Eliminar')
+          )
+        )
+      );
+    }),
+    h('div',{style:{height:70}})
+  );
+}
+
+// ─── REPORTE ───────────────────────────────
+function TabReporte({alquileres,pagos,variables,inquilinos}){
+  const[mes,setMes]=useState(mesKey(NOW.getFullYear(),NOW.getMonth()));
+  const[year,month]=mes.split('-').map(Number);
+  const vm=variables[mes]||{};
+  const mesesDisp=[];
+  for(let i=-3;i<=6;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);mesesDisp.push({key:mesKey(d.getFullYear(),d.getMonth()),label:mesLabel(d.getFullYear(),d.getMonth())})}
+
+  const rows=alquileres.filter(a=>a.activo!==false).map(a=>{
+    const montoObj=calcularMonto(a,year,month-1,variables);
+    const esp=montoAPesos(montoObj,vm);
+    const est=estadoPago(a.id,mes,pagos,esp);
+    const inq=inquilinos.find(i=>i.id===a.inquilinoId);
+    return{a,montoObj,est,inq};
+  });
+
+  const totalEsp=rows.reduce((s,r)=>s+(r.est.esperado||0),0);
+  const totalCob=rows.reduce((s,r)=>s+r.est.pagado,0);
+  const pagados=rows.filter(r=>r.est.estado==='pagado').length;
+  const pendientes=rows.filter(r=>r.est.estado==='pendiente').length;
+
+  const exportar=()=>{
+    const lines=[`AlquiGest — Reporte ${mesLabel(year,month-1)}`,'',
+      'Propiedad | Inquilino | Esperado | Pagado ARS | Forma pago | Estado'];
+    rows.forEach(({a,montoObj,est,inq})=>{
+      const p=pagos[`${a.id}_${mes}`];
+      lines.push(`${a.nombrePropiedad} | ${inq?.nombre||'—'} | ${montoObj?fmtNum(montoObj.monto,montoObj.moneda):'—'} | ${fmtNum(est.pagado,'pesos')} | ${p?.tipoPago||'—'}${p?.detallePago?' ('+p.detallePago+')':''} | ${est.estado}`);
+    });
+    lines.push('',`TOTAL ESPERADO (ARS): ${fmtNum(totalEsp,'pesos')}`,`TOTAL COBRADO (ARS): ${fmtNum(totalCob,'pesos')}`,`DEUDA: ${fmtNum(totalEsp-totalCob,'pesos')}`);
+    const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`reporte_${mes}.txt`;a.click();
+  };
+
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},'Reporte mensual'),
+    h('div',{className:'form-group'},h('select',{className:'form-select',value:mes,onChange:(e)=>setMes(e.target.value)},mesesDisp.map(m=>h('option',{key:m.key,value:m.key},m.label)))),
+    h('div',{className:'stats-row'},
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--green)'}},pagados),h('div',{className:'stat-label'},'Pagados')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{color:'var(--red)'}},pendientes),h('div',{className:'stat-label'},'Pendientes'))
+    ),
+    h('div',{className:'stats-row'},
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{fontSize:15}},fmtNum(totalCob,'pesos')),h('div',{className:'stat-label'},'Total cobrado')),
+      h('div',{className:'stat-box'},h('div',{className:'stat-num',style:{fontSize:15,color:'var(--red)'}},fmtNum(totalEsp-totalCob,'pesos')),h('div',{className:'stat-label'},'Deuda total'))
+    ),
+    rows.map(({a,montoObj,est,inq})=>{
+      const p=pagos[`${a.id}_${mes}`];
+      return h('div',{key:a.id,className:'card'},
+        h('div',{className:'card-row'},
+          h('div',null,h('div',{style:{fontWeight:700}},a.nombrePropiedad||'—'),h('div',{style:{fontSize:13,color:'var(--text2)'}},inq?.nombre||'—')),
+          h(Badge,{estado:est.estado})
+        ),
+        h('div',{className:'card-row'},h('span',{style:{fontSize:13,color:'var(--text2)'}},'Esperado'),h('span',{style:{fontWeight:600}},montoObj?fmtNum(montoObj.monto,montoObj.moneda):'—')),
+        h('div',{className:'card-row'},h('span',{style:{fontSize:13,color:'var(--text2)'}},'Pagado ARS'),h('span',{style:{fontWeight:600,color:est.pagado>=(est.esperado||0)?'var(--green)':'var(--red)'}},fmtNum(est.pagado,'pesos'))),
+        p&&h('div',{className:'card-row'},
+          h('span',{style:{fontSize:13,color:'var(--text2)'}},'Forma pago'),
+          h('span',{style:{fontSize:13}},(p.tipoPago==='transferencia'?'🏦':p.tipoPago==='cheque'?'📋':'💵')+' '+(p.tipoPago||'')+(p.detallePago?' · '+p.detallePago:''))
+        )
+      );
+    }),
+    rows.length>0&&h('button',{className:'btn-secondary',style:{marginTop:8},onClick:exportar},'⬇ Exportar reporte (.txt)')
+  );
+}
+
+// ─── DRIVE TAB ─────────────────────────────
+function TabDrive({driveUser,syncStatus,lastSync,signIn,signOut,pullDrive}){
+  const hasClientId=drive.hasClientId();
+  return h('div',{className:'content'},
+    h('p',{className:'section-title'},'Google Drive'),
+    !driveUser&&h('div',null,
+      h('div',{className:'alert alert-info'},'Conectá tu cuenta para guardar todos los datos en Drive y nunca perderlos.'),
+      h('button',{className:'btn-google',onClick:signIn,disabled:syncStatus==='loading'},
+        h('svg',{width:20,height:20,viewBox:'0 0 24 24'},
+          h('path',{d:'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z',fill:'#4285F4'}),
+          h('path',{d:'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z',fill:'#34A853'}),
+          h('path',{d:'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z',fill:'#FBBC05'}),
+          h('path',{d:'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z',fill:'#EA4335'})
+        ),
+        syncStatus==='loading'?'Conectando...':'Conectar con Google'
+      )
+    ),
+    driveUser&&h('div',null,
+      h('div',{className:'card'},
+        h('div',{className:'card-row'},
+          h('div',null,h('div',{style:{fontWeight:700}},driveUser.name||driveUser.email),h('div',{style:{fontSize:13,color:'var(--text2)'}},driveUser.email)),
+          h('div',{style:{width:38,height:38,borderRadius:19,background:'var(--blue-bg)',color:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:15}},(driveUser.name||driveUser.email||'?')[0].toUpperCase())
+        ),
+        h('div',{className:'divider'}),
+        h('div',{className:'card-row'},h('span',{style:{fontSize:14,color:'var(--text2)'}},'Estado sync'),
+          h('span',{className:`badge ${syncStatus==='ok'?'badge-paid':syncStatus==='error'?'badge-pending':'badge-partial'}`},syncStatus==='ok'?'✓ Sincronizado':syncStatus==='loading'?'Sincronizando...':'Error')
+        ),
+        lastSync&&h('div',{className:'card-row'},h('span',{style:{fontSize:14,color:'var(--text2)'}},'Último sync'),h('span',{style:{fontSize:13}},lastSync.toLocaleTimeString('es-AR')))
+      ),
+      h('button',{className:'btn-secondary',style:{marginBottom:8},onClick:pullDrive},'↓ Traer datos desde Drive'),
+      h('button',{className:'btn-danger',onClick:signOut},'Desconectar')
+    )
+  );
+}
+
+// ═══════════════════════════════════════════
+// LOGIN SCREEN
+// ═══════════════════════════════════════════
+function LoginScreen({onSignIn,loading,error}){
+  return h('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',background:'var(--page)'}},
+    h('div',{style:{width:64,height:64,borderRadius:18,background:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20,fontSize:28}},'🏠'),
+    h('h1',{style:{fontSize:26,fontWeight:800,marginBottom:6,letterSpacing:'-.5px'}},'AlquiGest'),
+    h('p',{style:{fontSize:15,color:'var(--text2)',marginBottom:32,textAlign:'center',lineHeight:1.5}},'Gestión de alquileres\nIniciá sesión para acceder'),
+    h('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,padding:'24px 20px',width:'100%',maxWidth:340,boxShadow:'var(--shadow)'}},
+      h('p',{style:{fontSize:14,color:'var(--text2)',textAlign:'center',marginBottom:16,lineHeight:1.5}},'Tus datos están protegidos.\nSolo vos podés acceder con tu cuenta Google.'),
+      error&&h('div',{className:'alert alert-warn',style:{marginBottom:12}},error),
+      h('button',{className:'btn-google',onClick:onSignIn,disabled:loading,style:{marginTop:0}},
+        loading?h('span',null,'Conectando...'):[
+          h('svg',{key:'logo',width:20,height:20,viewBox:'0 0 24 24'},
+            h('path',{d:'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z',fill:'#4285F4'}),
+            h('path',{d:'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z',fill:'#34A853'}),
+            h('path',{d:'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z',fill:'#FBBC05'}),
+            h('path',{d:'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z',fill:'#EA4335'})
+          ),
+          h('span',{key:'txt'},'Ingresar con Google')
+        ]
+      )
+    ),
+    h('p',{style:{fontSize:12,color:'var(--text2)',marginTop:24,textAlign:'center'}},'Solo usuarios autorizados pueden acceder')
+  );
+}
+
+// ═══════════════════════════════════════════
+// APP ROOT
+// ═══════════════════════════════════════════
+function App(){
+  const store=useStore();
+  const{propiedades,inquilinos,alquileres,pagos,variables,gastos,grupos,propietarios,indices,expensas,
+    addProp,updProp,delProp,addInq,updInq,delInq,addAlq,updAlq,delAlq,
+    regPago,delPago,setVar,addGasto,delGasto,
+    addPagoV4,delPagoV4,addGrupo,delGrupo,addOwner,updOwner,delOwner,
+    addIndice,setIndiceVal,delIndice,addExpensa,updExpensaPago,delExpensa,
+    driveUser,syncStatus,lastSync,signIn,signOut,pullDrive}=store;
+
+  const[tab,setTab]=useState('home');
+  const[modal,setModal]=useState(null);
+  const[loginError,setLoginError]=useState(null);
+  const closeModal=()=>setModal(null);
+
+  const mesActualKey=mesKey(NOW.getFullYear(),NOW.getMonth());
+  const vm=variables[mesActualKey]||{};
+
+  // ── AUTH GATE ──────────────────────────────
+  if(!driveUser){
+    const handleLogin=async()=>{
+      setLoginError(null);
+      try{await signIn()}
+      catch(e){setLoginError('No se pudo iniciar sesión. Intentá de nuevo.')}
+    };
+    return h(LoginScreen,{onSignIn:handleLogin,loading:syncStatus==='loading',error:loginError});
+  }
+
+  const TABS=[
+    {id:'home',icon:'🏠',label:'Inicio'},
+    {id:'props',icon:'🏢',label:'Propied.'},
+    {id:'inqs',icon:'👤',label:'Inquilin.'},
+    {id:'owners',icon:'👔',label:'Propiet.'},
+    {id:'contratos',icon:'📄',label:'Contratos'},
+    {id:'vars',icon:'📈',label:'Variables'},
+    {id:'gastos',icon:'🔧',label:'Gastos'},
+    {id:'expensas',icon:'🏦',label:'Expensas'},
+    {id:'roi',icon:'💰',label:'ROI'},
+    {id:'reporte',icon:'📊',label:'Reporte'},
+    {id:'drive',icon:'☁️',label:'Drive'},
+  ];
+
+  const initials=driveUser?(driveUser.name||driveUser.email||'?')[0].toUpperCase():null;
+
+  const fabActions={
+    home:()=>setModal({type:'alq',data:null}),
+    props:()=>setModal({type:'prop',data:null}),
+    inqs:()=>setModal({type:'inq',data:null}),
+    owners:()=>setModal({type:'owner',data:null}),
+    contratos:()=>setModal({type:'alq',data:null}),
+    gastos:()=>setModal({type:'gasto'}),
+  };
+
+  return h('div',null,
+    h('div',{className:'nav'},
+      h('div',{className:'nav-title'},'PropControl'),
+      h('button',{className:'nav-user',onClick:()=>setTab('drive'),title:driveUser.email},initials)
+    ),
+    h(SyncBar,{status:syncStatus,lastSync,user:driveUser,onPull:pullDrive}),
+    h('div',{className:'tabs'},
+      TABS.map(t=>h('button',{key:t.id,className:`tab ${tab===t.id?'active':''}`,onClick:()=>setTab(t.id)},
+        h('span',{className:'tab-icon'},t.icon),t.label
+      ))
+    ),
+
+    tab==='home'&&h(TabDashboard,{alquileres,pagos,variables,propiedades,inquilinos,grupos,setModal}),
+    tab==='props'&&h(TabPropiedades,{propiedades,alquileres,grupos,setModal,onAddGrupo:addGrupo,onDelGrupo:delGrupo}),
+    tab==='inqs'&&h(TabInquilinos,{inquilinos,alquileres,setModal}),
+    tab==='owners'&&h(TabPropietarios,{propietarios,propiedades,alquileres,pagos,setModal}),
+    tab==='contratos'&&h(TabContratos,{alquileres,propiedades,inquilinos,setModal}),
+    tab==='vars'&&h(TabVariablesV4,{variables,setVar,indices,addIndice,setIndiceVal,delIndice}),
+    tab==='gastos'&&h(TabGastos,{gastos,propiedades,setModal,delGasto}),
+    tab==='expensas'&&h(TabExpensas,{expensas,propiedades,grupos,addExpensa,updExpensaPago,delExpensa}),
+    tab==='roi'&&h(TabROI,{propiedades,alquileres,pagos,gastos,grupos}),
+    tab==='reporte'&&h(TabReporte,{alquileres,pagos,variables,inquilinos}),
+    tab==='drive'&&h(TabDrive,{driveUser,syncStatus,lastSync,signIn,signOut,pullDrive}),
+
+    fabActions[tab]&&h('button',{className:'fab',onClick:fabActions[tab]},'+'),
+
+    // MODALES
+    modal?.type==='pago'&&h(ModalPagoV4,{
+      alquiler:modal.alquiler,mes:modal.mes,
+      montoEsperadoObj:modal.montoEsperadoObj,vm:modal.vm||vm,
+      pagosDelMes:modal.pagosDelMes||[],
+      inquilinos,onClose:closeModal,
+      onAdd:(pago)=>addPagoV4(modal.alquiler.id,modal.mes.key,pago),
+      onDel:(pagoId)=>delPagoV4(modal.alquiler.id,modal.mes.key,pagoId)
+    }),
+
+    modal?.type==='alq'&&h(FormAlquiler,{
+      initial:modal.data,propiedades,inquilinos,
+      onSave:(data)=>modal.data?updAlq(modal.data.id,data):addAlq(data),
+      onDelete:()=>modal.data&&delAlq(modal.data.id),
+      onNuevaProp:(p)=>{const np={...p,id:uid(),activo:true};addProp(np);},
+      onNuevoInq:(i)=>{const ni={...i,id:uid()};addInq(ni);},
+      onClose:closeModal
+    }),
+
+    modal?.type==='hist'&&h(Historial,{
+      alquiler:modal.alquiler,pagos,variables,inquilinos,
+      onClose:closeModal,
+      onRegistrar:(m,montoObj,vm,pago)=>setModal({type:'pago',alquiler:modal.alquiler,mes:m,montoEsperadoObj:montoObj,vm,pagoActual:pago})
+    }),
+
+    modal?.type==='inq'&&h(FormInquilino,{
+      initial:modal.data,
+      onSave:(d)=>modal.data?updInq(modal.data.id,d):addInq(d),
+      onDelete:()=>modal.data&&delInq(modal.data.id),
+      onClose:closeModal
+    }),
+
+    modal?.type==='prop'&&h(FormPropiedad,{
+      initial:modal.data,
+      onSave:(d)=>modal.data?updProp(modal.data.id,d):addProp(d),
+      onDelete:()=>modal.data&&delProp(modal.data.id),
+      onClose:closeModal
+    }),
+
+    modal?.type==='gasto'&&h(FormGasto,{
+      propiedades,
+      onSave:(g)=>addGasto(g),
+      onClose:closeModal
+    }),
+    modal?.type==='owner'&&h(FormOwner,{
+      initial:modal.data,
+      onSave:(d)=>modal.data?updOwner(modal.data.id,d):addOwner(d),
+      onDelete:()=>modal.data&&delOwner(modal.data.id),
+      onClose:closeModal
+    })
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
