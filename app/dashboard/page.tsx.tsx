@@ -396,6 +396,35 @@ export default function Dashboard(){
   const [authLoading,setAuthLoading]=useState(true)
 
   useEffect(()=>{
+    // Handle implicit flow (token in hash)
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      // Let Supabase parse the hash
+      sb.auth.getSession().then(async({data:{session}})=>{
+        if(session){
+          setUser(session.user)
+          const{data}=await sb.from('usuarios').select('*').eq('id',session.user.id).single()
+          setUserData(data)
+          setAuthLoading(false)
+          // Clean the URL
+          window.history.replaceState(null,'','/dashboard')
+        } else {
+          // Try to set session from hash
+          sb.auth.onAuthStateChange(async(event, session) => {
+            if(session){
+              setUser(session.user)
+              const{data}=await sb.from('usuarios').select('*').eq('id',session.user.id).single()
+              setUserData(data)
+              setAuthLoading(false)
+              window.history.replaceState(null,'','/dashboard')
+            } else {
+              router.push('/')
+            }
+          })
+        }
+      })
+      return
+    }
     sb.auth.getSession().then(async({data:{session}})=>{
       if(!session){router.push('/');return}
       setUser(session.user)
