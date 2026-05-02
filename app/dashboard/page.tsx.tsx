@@ -771,7 +771,7 @@ export default function Dashboard(){
       {/* TABS */}
       <div style={{display:'flex',background:'white',borderBottom:'1px solid #e5e7eb',overflowX:'auto',scrollbarWidth:'none'}}>
         {TABS.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,minWidth:46,padding:'10px 2px 8px',textAlign:'center',fontSize:10,fontWeight:600,color:tab===t.id?'#2563eb':'#6b7280',borderBottom:`2px solid ${tab===t.id?'#2563eb':'transparent'}`,background:'none',border:'none',borderBottom:`2px solid ${tab===t.id?'#2563eb':'transparent'}`,cursor:'pointer',whiteSpace:'nowrap'}}>
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,minWidth:46,padding:'10px 2px 8px',textAlign:'center',fontSize:10,fontWeight:600,color:tab===t.id?'#2563eb':'#6b7280',borderBottom:`2px solid ${tab===t.id?'#2563eb':'transparent'}`,background:'none',border:'none',cursor:'pointer',whiteSpace:'nowrap'}}>
             <span style={{display:'block',fontSize:16,marginBottom:2}}>{t.ico}</span>{t.lbl}
           </button>
         ))}
