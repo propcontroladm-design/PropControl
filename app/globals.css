@@ -1,0 +1,13 @@
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#16a344;--green-bg:#dcfce7;--green-text:#14532d;
+  --red:#dc2626;--red-bg:#fee2e2;--red-text:#7f1d1d;
+  --yellow:#d97706;--yellow-bg:#fef3c7;--yellow-text:#78350f;
+  --blue:#1e3a8a;--blue-light:#2563eb;--blue-bg:#dbeafe;
+  --gray:#6b7280;--gray-bg:#f3f4f6;--border:#e5e7eb;
+  --text:#111827;--text2:#6b7280;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;color:#111827}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;border:none;font-family:inherit}
+input,select,textarea{font-family:inherit;color:#111827}
