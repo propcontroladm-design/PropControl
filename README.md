@@ -1,2 +1,2 @@
 # PropControl
-Gestión profesional de alquileres
+Alquileres
