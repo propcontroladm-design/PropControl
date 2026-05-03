@@ -20,20 +20,36 @@ function waURL(t:string,m:string){return 'https://wa.me/'+t.replace(/\D/g,'')+'?
 
 function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   if(!alq?.contrato)return null
-  const c=alq.contrato,mesK=mk(y,m),vm=(vars&&vars[mesK])||{},iva=c.iva?1.21:1
+  const c=alq.contrato,mesK=mk(y,m),vm=(vars&&vars[mesK])||{}
   const ini=new Date((alq.fecha_inicio||'2025-01-01')+'T00:00:00')
   const mr=(y-ini.getFullYear())*12+(m-ini.getMonth())+1
   function debeAj(fr:string){if(!fr||fr==='mensual')return true;if(fr==='trimestral')return (mr-1)%3===0;if(fr==='semestral')return (mr-1)%6===0;if(fr==='anual')return (mr-1)%12===0;return true}
-  function cb(base:number,mon:string,aj:string,iid:string,fr:string){
+  function cb(base:number,mon:string,aj:string,iid:string,fr:string,iva:boolean){
     let v=parseFloat(String(base))||0
     if(debeAj(fr)){
       if(aj==='ipc'&&vm.ipc)v=v*(1+vm.ipc/100)
       else if(aj==='custom'&&iid&&idx){const x=idx.find((i:any)=>i.id===iid);if(x?.valores?.[mesK])v=v*(1+x.valores[mesK]/100)}
     }
-    return{monto:v*iva,moneda:mon||'pesos',iva:!!c.iva}
+    return{monto:v*(iva?1.21:1),moneda:mon||'pesos',iva:!!iva}
   }
-  if(c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste)
-  if(c.tipo==='escalonado'){const tr=c.tramos||[];const t=tr.find((t:any)=>mr>=t.mesDesde&&mr<=t.mesHasta);if(!t)return null;return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste)}
+  // NEW: multi-conceptos
+  if(c.conceptos && c.conceptos.length>0){
+    const items=c.conceptos.map((cp:any)=>{
+      const r=cb(cp.monto,cp.moneda,cp.ajuste,cp.indice_id,cp.frec_ajuste,cp.iva)
+      return{...r,nombre:cp.nombre||'Concepto'}
+    })
+    // Convert all to pesos and sum
+    const totP=items.reduce((s:number,it:any)=>{
+      if(it.moneda==='pesos')return s+it.monto
+      if(it.moneda==='dolar')return s+it.monto*((vm&&vm.dolar)||0)
+      return s+it.monto*((vm&&vm.nafta)||0)
+    },0)
+    return{monto:totP,moneda:'pesos',iva:false,items,multi:true}
+  }
+  // Single concept (legacy)
+  const iva=c.iva?true:false
+  if(c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
+  if(c.tipo==='escalonado'){const tr=c.tramos||[];const t=tr.find((t:any)=>mr>=t.mesDesde&&mr<=t.mesHasta);if(!t)return null;return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
   return null
 }
 
@@ -273,20 +289,55 @@ function FormInq({ini,onSave,onDelete,onClose}:any){
 
 // ─── FORM CONTRATO ────────────────────────────
 function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
-  const [d,setD]=useState(ini||{propiedad_id:'',inquilino_id:'',fecha_inicio:new Date().toISOString().slice(0,10),activo:true,tipo:'fijo',moneda:'pesos',monto_base:'',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,tramos:[{id:uid(),mesDesde:1,mesHasta:6,montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]})
+  // Detect mode: if has conceptos use new mode, else old mode
+  const hasConceptos = ini?.contrato?.conceptos?.length > 0
+  const [modo,setModo]=useState<'simple'|'multi'>(hasConceptos?'multi':(ini?'simple':'simple'))
+  const [d,setD]=useState(ini||{
+    propiedad_id:'',inquilino_id:'',fecha_inicio:new Date().toISOString().slice(0,10),activo:true,
+    tipo:'fijo',moneda:'pesos',monto_base:'',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,
+    tramos:[{id:uid(),mesDesde:1,mesHasta:6,montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}],
+    conceptos:[]
+  })
+  // If multi mode and no conceptos, init with default
+  useEffect(()=>{
+    if(modo==='multi'&&(!d.conceptos||d.conceptos.length===0)){
+      setD((p:any)=>({...p,conceptos:[
+        {id:uid(),nombre:'Alquiler',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false}
+      ]}))
+    }
+  },[modo])
+
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const upT=(tid:string,f:string,v:any)=>setD((p:any)=>({...p,tramos:p.tramos.map((t:any)=>t.id===tid?{...t,[f]:v}:t)}))
   const addT=()=>setD((p:any)=>{const last=p.tramos[p.tramos.length-1];const desde=last?last.mesHasta+1:1;return{...p,tramos:[...p.tramos,{id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:p.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}})
   const delT=(tid:string)=>setD((p:any)=>({...p,tramos:p.tramos.filter((t:any)=>t.id!==tid)}))
-  const ok=d.propiedad_id&&d.inquilino_id&&d.fecha_inicio&&(d.tipo==='fijo'?d.monto_base:d.tramos.every((t:any)=>t.montoBase))
+
+  // Conceptos handlers
+  const upC=(cid:string,f:string,v:any)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>cp.id===cid?{...cp,[f]:v}:cp)}))
+  const addC=()=>setD((p:any)=>({...p,conceptos:[...(p.conceptos||[]),{id:uid(),nombre:'',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false}]}))
+  const delC=(cid:string)=>setD((p:any)=>({...p,conceptos:p.conceptos.filter((cp:any)=>cp.id!==cid)}))
+
+  const ok=d.propiedad_id&&d.inquilino_id&&d.fecha_inicio&&(
+    modo==='multi' ? (d.conceptos?.length>0 && d.conceptos.every((cp:any)=>cp.nombre&&cp.monto)) :
+    (d.tipo==='fijo'?d.monto_base:d.tramos.every((t:any)=>t.montoBase))
+  )
   const prop=props.find((p:any)=>p.id===d.propiedad_id)
   const inq=inqs.find((i:any)=>i.id===d.inquilino_id)
 
   const handleSave=()=>{
     if(!ok)return
-    const data={...d,nombre_propiedad:prop?(prop.nombre||prop.codigo):'',nombre_inquilino:inq?inq.nombre:''}
-    if(data.tipo==='fijo')data.monto_base=parseFloat(data.monto_base)||0
-    else data.tramos=data.tramos.map((t:any)=>({...t,montoBase:parseFloat(t.montoBase)||0}))
+    let data:any={...d,nombre_propiedad:prop?(prop.nombre||prop.codigo):'',nombre_inquilino:inq?inq.nombre:''}
+    if(modo==='multi'){
+      data.conceptos=data.conceptos.map((cp:any)=>({...cp,monto:parseFloat(cp.monto)||0}))
+      // Clear old fields
+      data.tipo='multi'
+      data.monto_base=0
+      data.tramos=[]
+    } else {
+      data.conceptos=[]
+      if(data.tipo==='fijo')data.monto_base=parseFloat(data.monto_base)||0
+      else data.tramos=data.tramos.map((t:any)=>({...t,montoBase:parseFloat(t.montoBase)||0}))
+    }
     onSave(data);onClose()
   }
 
@@ -311,73 +362,128 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
           </select>
         </div>
         <div style={S.fg}><label style={S.lbl}>Inicio</label><input style={S.inp} type="date" value={d.fecha_inicio} onChange={e=>up('fecha_inicio',e.target.value)}/></div>
-        <div style={S.fg}><label style={S.lbl}>Tipo</label>
-          <select style={S.sel} value={d.tipo} onChange={e=>up('tipo',e.target.value)}>
-            <option value="fijo">Monto fijo</option><option value="escalonado">Escalonado por tramos</option>
-          </select>
+
+        <div style={S.fg}><label style={S.lbl}>Modo de contrato</label>
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={()=>setModo('simple')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='simple'?'#2563eb':'#e5e7eb'}`,background:modo==='simple'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='simple'?'#2563eb':'#6b7280',cursor:'pointer'}}>
+              Simple<div style={{fontSize:10,fontWeight:500,marginTop:2}}>1 monto</div>
+            </button>
+            <button onClick={()=>setModo('multi')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='multi'?'#2563eb':'#e5e7eb'}`,background:modo==='multi'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='multi'?'#2563eb':'#6b7280',cursor:'pointer'}}>
+              Conceptos<div style={{fontSize:10,fontWeight:500,marginTop:2}}>varios items</div>
+            </button>
+          </div>
         </div>
-        {d.tipo==='fijo'&&<div>
-          <div style={S.fg}><label style={S.lbl}>Monto base</label>
-            <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
-              <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={d.moneda} onChange={e=>up('moneda',e.target.value)}>
-                <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
-              </select>
-              <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={d.monto_base} onChange={e=>up('monto_base',e.target.value)}/>
-            </div>
+
+        {modo==='multi'&&<div>
+          <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+            💡 Útil cuando una propiedad tiene varios conceptos (ej: alquiler sin IVA + cochera con IVA + expensas).
           </div>
-          <div style={{display:'flex',gap:9,marginBottom:11}}>
-            <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
-              <select style={S.sel} value={d.ajuste} onChange={e=>up('ajuste',e.target.value)}>
-                {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
-              </select>
-            </div>
-            <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
-              <select style={S.sel} value={d.frec_ajuste||'mensual'} onChange={e=>up('frec_ajuste',e.target.value)}>
-                {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>}
-        {d.tipo==='escalonado'&&<div>
-          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Tramos</p>
-          {d.tramos.map((t:any,i:number)=>(
-            <div key={t.id} style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:6,border:'1px solid #e5e7eb'}}>
+          {(d.conceptos||[]).map((cp:any,i:number)=>(
+            <div key={cp.id} style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:6,border:'1px solid #e5e7eb'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                <span style={{fontWeight:700,fontSize:14}}>Tramo {i+1}</span>
-                {d.tramos.length>1&&<button style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delT(t.id)}>✕</button>}
+                <span style={{fontWeight:700,fontSize:13}}>Concepto {i+1}</span>
+                {d.conceptos.length>1&&<button style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delC(cp.id)}>✕</button>}
               </div>
-              <div style={{display:'flex',gap:9,marginBottom:8}}>
-                <div style={{flex:1}}><label style={S.lbl}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upT(t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
-                <div style={{flex:1}}><label style={S.lbl}>Hasta mes</label><input style={S.inp} type="number" min={1} value={t.mesHasta} onChange={e=>upT(t.id,'mesHasta',parseInt(e.target.value)||12)}/></div>
-              </div>
+              <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={cp.nombre} onChange={e=>upC(cp.id,'nombre',e.target.value)} placeholder="Ej: Alquiler / Cochera / Expensas"/></div>
               <div style={S.fg}><label style={S.lbl}>Monto</label>
                 <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
-                  <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={t.moneda||'pesos'} onChange={e=>upT(t.id,'moneda',e.target.value)}>
+                  <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={cp.moneda} onChange={e=>upC(cp.id,'moneda',e.target.value)}>
                     <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
                   </select>
-                  <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={t.montoBase} onChange={e=>upT(t.id,'montoBase',e.target.value)}/>
+                  <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={cp.monto} onChange={e=>upC(cp.id,'monto',e.target.value)}/>
                 </div>
               </div>
-              <div style={{display:'flex',gap:9}}>
+              <div style={{display:'flex',gap:9,marginBottom:9}}>
                 <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
-                  <select style={S.sel} value={t.ajuste||'ninguno'} onChange={e=>upT(t.id,'ajuste',e.target.value)}>
+                  <select style={S.sel} value={cp.ajuste||'ninguno'} onChange={e=>upC(cp.id,'ajuste',e.target.value)}>
                     {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
                   </select>
                 </div>
                 <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
-                  <select style={S.sel} value={t.frecAjuste||'mensual'} onChange={e=>upT(t.id,'frecAjuste',e.target.value)}>
+                  <select style={S.sel} value={cp.frec_ajuste||'mensual'} onChange={e=>upC(cp.id,'frec_ajuste',e.target.value)}>
                     {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
                   </select>
                 </div>
               </div>
+              <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:13}}>
+                <input type="checkbox" id={`iva_${cp.id}`} checked={!!cp.iva} onChange={e=>upC(cp.id,'iva',e.target.checked)} style={{width:17,height:17,accentColor:'#2563eb'}}/>
+                <label htmlFor={`iva_${cp.id}`} style={{fontWeight:600}}>Aplicar IVA 21% a este concepto</label>
+              </div>
             </div>
           ))}
-          <button style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addT}>+ Agregar tramo</button>
+          <button style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addC}>+ Agregar concepto</button>
         </div>}
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',fontSize:14,marginBottom:8}}>
-          <input type="checkbox" id="ck_iva" checked={d.iva} onChange={e=>up('iva',e.target.checked)} style={{width:17,height:17,accentColor:'#2563eb'}}/>
-          <label htmlFor="ck_iva">Aplicar IVA 21%</label>
-        </div>
+
+        {modo==='simple'&&<div>
+          <div style={S.fg}><label style={S.lbl}>Tipo</label>
+            <select style={S.sel} value={d.tipo} onChange={e=>up('tipo',e.target.value)}>
+              <option value="fijo">Monto fijo</option><option value="escalonado">Escalonado por tramos</option>
+            </select>
+          </div>
+          {d.tipo==='fijo'&&<div>
+            <div style={S.fg}><label style={S.lbl}>Monto base</label>
+              <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
+                <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={d.moneda} onChange={e=>up('moneda',e.target.value)}>
+                  <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
+                </select>
+                <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={d.monto_base} onChange={e=>up('monto_base',e.target.value)}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:9,marginBottom:11}}>
+              <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
+                <select style={S.sel} value={d.ajuste} onChange={e=>up('ajuste',e.target.value)}>
+                  {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
+                </select>
+              </div>
+              <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
+                <select style={S.sel} value={d.frec_ajuste||'mensual'} onChange={e=>up('frec_ajuste',e.target.value)}>
+                  {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>}
+          {d.tipo==='escalonado'&&<div>
+            <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Tramos</p>
+            {d.tramos.map((t:any,i:number)=>(
+              <div key={t.id} style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:6,border:'1px solid #e5e7eb'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <span style={{fontWeight:700,fontSize:14}}>Tramo {i+1}</span>
+                  {d.tramos.length>1&&<button style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delT(t.id)}>✕</button>}
+                </div>
+                <div style={{display:'flex',gap:9,marginBottom:8}}>
+                  <div style={{flex:1}}><label style={S.lbl}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upT(t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
+                  <div style={{flex:1}}><label style={S.lbl}>Hasta mes</label><input style={S.inp} type="number" min={1} value={t.mesHasta} onChange={e=>upT(t.id,'mesHasta',parseInt(e.target.value)||12)}/></div>
+                </div>
+                <div style={S.fg}><label style={S.lbl}>Monto</label>
+                  <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
+                    <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={t.moneda||'pesos'} onChange={e=>upT(t.id,'moneda',e.target.value)}>
+                      <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
+                    </select>
+                    <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={t.montoBase} onChange={e=>upT(t.id,'montoBase',e.target.value)}/>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:9}}>
+                  <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
+                    <select style={S.sel} value={t.ajuste||'ninguno'} onChange={e=>upT(t.id,'ajuste',e.target.value)}>
+                      {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
+                    </select>
+                  </div>
+                  <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
+                    <select style={S.sel} value={t.frecAjuste||'mensual'} onChange={e=>upT(t.id,'frecAjuste',e.target.value)}>
+                      {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addT}>+ Agregar tramo</button>
+          </div>}
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',fontSize:14,marginBottom:8}}>
+            <input type="checkbox" id="ck_iva" checked={d.iva} onChange={e=>up('iva',e.target.checked)} style={{width:17,height:17,accentColor:'#2563eb'}}/>
+            <label htmlFor="ck_iva">Aplicar IVA 21%</label>
+          </div>
+        </div>}
+
         <button style={{...S.btnP,opacity:ok?1:.5,marginTop:5}} disabled={!ok} onClick={handleSave}>Guardar contrato</button>
         {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar contrato</button>}
         <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
@@ -845,7 +951,7 @@ export default function Dashboard(){
       {modal?.type==='contrato'&&<FormContrato
         ini={modal.data} props={props} inqs={inqs}
         onSave={async(d:any)=>{
-          const payload={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino,contrato:{...d}}
+          const payload={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino,contrato:{...d}}
           if(modal.data)await store.updContrato(modal.data.id,payload)
           else await store.addContrato(payload)
         }}
