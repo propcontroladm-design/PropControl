@@ -836,6 +836,17 @@ export default function Dashboard(){
       const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`reporte_${mesActK}.txt`;a.click()
     }
 
+    const backupCompleto=()=>{
+      const data={
+        version:'1.0',
+        fecha:new Date().toISOString(),
+        usuario:user?.email,
+        propiedades:props,inquilinos:inqs,contratos,pagos,gastos,grupos,propietarios:owners,variables:vars
+      }
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+      const url=URL.createObjectURL(blob);const a=document.createElement('a')
+      a.href=url;a.download=`backup_propcontrol_${new Date().toISOString().slice(0,10)}.json`;a.click()
+    }
     return(
       <div style={{padding:14}}>
         <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>Reporte — {mlbl(NOW.getFullYear(),NOW.getMonth())}</p>
@@ -859,7 +870,11 @@ export default function Dashboard(){
             <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:13,color:'#6b7280'}}>Pagado ARS</span><span style={{fontWeight:600,color:total>=(espP||0)?'#16a34a':'#dc2626'}}>{fmtN(total,'pesos')}</span></div>
           </div>
         ))}
-        {rows.length>0&&<button style={{...S.btnS,marginTop:8}} onClick={exportar}>⬇ Exportar (.txt)</button>}
+        {rows.length>0&&<button style={{...S.btnS,marginTop:8}} onClick={exportar}>⬇ Exportar reporte (.txt)</button>}
+        <button style={{...S.btnP,marginTop:8,background:'#16a34a'}} onClick={backupCompleto}>💾 Backup completo de mis datos (.json)</button>
+        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginTop:8,background:'#fef3c7',color:'#78350f'}}>
+          ⚠️ Recomendamos hacer backup mensual de tus datos. El archivo .json contiene toda tu información y se descarga a tu computadora.
+        </div>
         <div style={{height:70}}/>
       </div>
     )

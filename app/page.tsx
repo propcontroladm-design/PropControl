@@ -45,6 +45,9 @@ export default function Home() {
               </button>
               <a href="#planes" style={{background:'rgba(255,255,255,0.1)',color:'white',padding:'16px 28px',borderRadius:12,fontSize:16,fontWeight:600,border:'1px solid rgba(255,255,255,0.2)',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>Ver planes →</a>
             </div>
+            <p style={{color:'rgba(255,255,255,0.5)',fontSize:12,marginTop:14}}>
+              Al registrarte aceptas nuestros <a href="/terminos" style={{color:'#86efac',textDecoration:'underline'}}>Terminos</a> y <a href="/privacidad" style={{color:'#86efac',textDecoration:'underline'}}>Politica de Privacidad</a>
+            </p>
           </div>
         </div>
       </div>
@@ -102,7 +105,12 @@ export default function Home() {
       </div>
       <footer style={{background:'#0f1f3d',padding:'40px 24px',textAlign:'center'}}>
         <span style={{color:'white',fontWeight:800,fontSize:20}}>Prop<span style={{color:'#4ade80'}}>Control</span></span>
-        <p style={{color:'rgba(255,255,255,0.4)',fontSize:13,marginTop:12}}>© 2026 PropControl · Clarita Maria Di Bacco · Yerba Buena, Tucuman</p>
+        <div style={{marginTop:14,display:'flex',gap:20,justifyContent:'center',flexWrap:'wrap'}}>
+          <a href="/terminos" style={{color:'rgba(255,255,255,0.7)',fontSize:13,textDecoration:'none'}}>Terminos y Condiciones</a>
+          <a href="/privacidad" style={{color:'rgba(255,255,255,0.7)',fontSize:13,textDecoration:'none'}}>Politica de Privacidad</a>
+          <a href="mailto:propcontroladm@gmail.com" style={{color:'rgba(255,255,255,0.7)',fontSize:13,textDecoration:'none'}}>Contacto</a>
+        </div>
+        <p style={{color:'rgba(255,255,255,0.4)',fontSize:13,marginTop:14}}>© 2026 PropControl · Clarita Maria Di Bacco · Yerba Buena, Tucuman</p>
       </footer>
     </div>
   )
