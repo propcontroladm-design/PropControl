@@ -517,11 +517,17 @@ export default function Dashboard(){
   async function loadUserAndWorkspaces(uid:string){
     const{data:userRow}=await sb.from('usuarios').select('*').eq('id',uid).single()
     setUserData(userRow)
-    // Load workspaces where user is member
-    const{data:memberships}=await sb.from('workspace_members').select('workspace_id,rol,workspaces(id,nombre,owner_id)').eq('usuario_id',uid).eq('estado','activo')
-    const wsList=(memberships||[]).map((m:any)=>({...m.workspaces,rol:m.rol})).filter((w:any)=>w&&w.id)
+    // Load memberships first (no join)
+    const{data:memberships}=await sb.from('workspace_members').select('workspace_id,rol').eq('usuario_id',uid).eq('estado','activo')
+    if(!memberships||memberships.length===0){setWorkspaces([]);return}
+    // Then load workspaces by IDs
+    const wsIds=memberships.map((m:any)=>m.workspace_id)
+    const{data:wsData}=await sb.from('workspaces').select('id,nombre,owner_id').in('id',wsIds)
+    const wsList=(wsData||[]).map((w:any)=>{
+      const m=memberships.find((mm:any)=>mm.workspace_id===w.id)
+      return{...w,rol:m?.rol||'editor'}
+    })
     setWorkspaces(wsList)
-    // Use saved workspace or first one
     const savedWs=typeof window!=='undefined'?localStorage.getItem('current_ws'):null
     const ws=wsList.find((w:any)=>w.id===savedWs)||wsList[0]
     if(ws)setCurrentWs(ws)
