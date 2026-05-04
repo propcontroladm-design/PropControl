@@ -60,7 +60,7 @@ function estP(cid:string,mesK:string,pagos:any[]){
 }
 
 // ─── STORE LOCAL ──────────────────────────────
-function useAppData(userId:string){
+function useAppData(workspaceId:string, userId:string){
   const [props,setProps]=useState<any[]>([])
   const [inqs,setInqs]=useState<any[]>([])
   const [contratos,setContratos]=useState<any[]>([])
@@ -73,58 +73,69 @@ function useAppData(userId:string){
   const [expensas,setExpensas]=useState<any[]>([])
   const [loading,setLoading]=useState(true)
 
-  useEffect(()=>{if(userId)loadAll()},[userId])
+  useEffect(()=>{if(workspaceId)loadAll()},[workspaceId])
 
   async function loadAll(){
+    if(!workspaceId)return
     setLoading(true)
     const [p,i,c,pg,g,gr,ow,ix,ex]=await Promise.all([
-      sb.from('propiedades').select('*').eq('usuario_id',userId),
-      sb.from('inquilinos').select('*').eq('usuario_id',userId),
-      sb.from('contratos').select('*').eq('usuario_id',userId),
-      sb.from('pagos').select('*').eq('usuario_id',userId),
-      sb.from('gastos').select('*').eq('usuario_id',userId),
-      sb.from('grupos').select('*').eq('usuario_id',userId),
-      sb.from('propietarios').select('*').eq('usuario_id',userId),
-      sb.from('indices').select('*').eq('usuario_id',userId),
-      sb.from('expensas').select('*').eq('usuario_id',userId),
+      sb.from('propiedades').select('*').eq('workspace_id',workspaceId),
+      sb.from('inquilinos').select('*').eq('workspace_id',workspaceId),
+      sb.from('contratos').select('*').eq('workspace_id',workspaceId),
+      sb.from('pagos').select('*').eq('workspace_id',workspaceId),
+      sb.from('gastos').select('*').eq('workspace_id',workspaceId),
+      sb.from('grupos').select('*').eq('workspace_id',workspaceId),
+      sb.from('propietarios').select('*').eq('workspace_id',workspaceId),
+      sb.from('indices').select('*').eq('workspace_id',workspaceId),
+      sb.from('expensas').select('*').eq('workspace_id',workspaceId),
     ])
     setProps(p.data||[]);setInqs(i.data||[]);setContratos(c.data||[])
     setPagos(pg.data||[]);setGastos(g.data||[]);setGrupos(gr.data||[])
     setOwners(ow.data||[]);setIndices(ix.data||[]);setExpensas(ex.data||[])
-    // Load variables
-    const vRes=await sb.from('variables').select('*').eq('usuario_id',userId)
+    const vRes=await sb.from('variables').select('*').eq('workspace_id',workspaceId)
     const vMap:any={}
     ;(vRes.data||[]).forEach((v:any)=>{vMap[v.periodo]={dolar:v.dolar,nafta:v.nafta,ipc:v.ipc}})
     setVars(vMap)
     setLoading(false)
   }
 
-  async function addProp(d:any){const{data}=await sb.from('propiedades').insert({...d,usuario_id:userId}).select().single();if(data)setProps(p=>[...p,data]);return data}
+  const ws={workspace_id:workspaceId, usuario_id:userId}
+
+  async function addProp(d:any){const{data}=await sb.from('propiedades').insert({...d,...ws}).select().single();if(data)setProps(p=>[...p,data]);return data}
   async function updProp(id:string,d:any){await sb.from('propiedades').update(d).eq('id',id);setProps(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delProp(id:string){await sb.from('propiedades').delete().eq('id',id);setProps(p=>p.filter(x=>x.id!==id))}
-  async function addInq(d:any){const{data}=await sb.from('inquilinos').insert({...d,usuario_id:userId}).select().single();if(data)setInqs(p=>[...p,data]);return data}
+  async function addInq(d:any){const{data}=await sb.from('inquilinos').insert({...d,...ws}).select().single();if(data)setInqs(p=>[...p,data]);return data}
   async function updInq(id:string,d:any){await sb.from('inquilinos').update(d).eq('id',id);setInqs(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delInq(id:string){await sb.from('inquilinos').delete().eq('id',id);setInqs(p=>p.filter(x=>x.id!==id))}
-  async function addContrato(d:any){const{data}=await sb.from('contratos').insert({...d,usuario_id:userId}).select().single();if(data)setContratos(p=>[...p,data]);return data}
+  async function addContrato(d:any){const{data}=await sb.from('contratos').insert({...d,...ws}).select().single();if(data)setContratos(p=>[...p,data]);return data}
   async function updContrato(id:string,d:any){await sb.from('contratos').update(d).eq('id',id);setContratos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delContrato(id:string){await sb.from('contratos').delete().eq('id',id);setContratos(p=>p.filter(x=>x.id!==id))}
-  async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,usuario_id:userId}).select().single();if(data)setPagos(p=>[...p,data]);return data}
+  async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,...ws}).select().single();if(data)setPagos(p=>[...p,data]);return data}
   async function delPago(id:string){await sb.from('pagos').delete().eq('id',id);setPagos(p=>p.filter(x=>x.id!==id))}
   async function setVar(periodo:string,field:string,val:number){
-    await sb.from('variables').upsert({usuario_id:userId,periodo,[field]:val},{onConflict:'usuario_id,periodo'})
+    await sb.from('variables').upsert({...ws,periodo,[field]:val},{onConflict:'workspace_id,periodo'})
     setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),[field]:val}}))
   }
-  async function addGasto(d:any){const{data}=await sb.from('gastos').insert({...d,usuario_id:userId}).select().single();if(data)setGastos(p=>[...p,data]);return data}
+  async function addGasto(d:any){const{data}=await sb.from('gastos').insert({...d,...ws}).select().single();if(data)setGastos(p=>[...p,data]);return data}
   async function delGasto(id:string){await sb.from('gastos').delete().eq('id',id);setGastos(p=>p.filter(x=>x.id!==id))}
-  async function addGrupo(d:any){const{data}=await sb.from('grupos').insert({...d,usuario_id:userId}).select().single();if(data)setGrupos(p=>[...p,data]);return data}
+  async function addGrupo(d:any){const{data}=await sb.from('grupos').insert({...d,...ws}).select().single();if(data)setGrupos(p=>[...p,data]);return data}
   async function delGrupo(id:string){await sb.from('grupos').delete().eq('id',id);setGrupos(p=>p.filter(x=>x.id!==id))}
-  async function addOwner(d:any){const{data}=await sb.from('propietarios').insert({...d,usuario_id:userId}).select().single();if(data)setOwners(p=>[...p,data]);return data}
+  async function addOwner(d:any){const{data}=await sb.from('propietarios').insert({...d,...ws}).select().single();if(data)setOwners(p=>[...p,data]);return data}
   async function updOwner(id:string,d:any){await sb.from('propietarios').update(d).eq('id',id);setOwners(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delOwner(id:string){await sb.from('propietarios').delete().eq('id',id);setOwners(p=>p.filter(x=>x.id!==id))}
 
+  // Bulk import
+  async function bulkImport(items:any[], tabla:string){
+    const records=items.map((it:any)=>({...it,...ws}))
+    const{data,error}=await sb.from(tabla).insert(records).select()
+    if(!error)await loadAll()
+    return{count:data?.length||0,error}
+  }
+
   return{props,inqs,contratos,pagos,vars,gastos,grupos,owners,indices,expensas,loading,
     addProp,updProp,delProp,addInq,updInq,delInq,addContrato,updContrato,delContrato,
-    addPago,delPago,setVar,addGasto,delGasto,addGrupo,delGrupo,addOwner,updOwner,delOwner,reload:loadAll}
+    addPago,delPago,setVar,addGasto,delGasto,addGrupo,delGrupo,addOwner,updOwner,delOwner,
+    bulkImport,reload:loadAll}
 }
 
 // ─── STYLES ───────────────────────────────────
@@ -497,30 +508,39 @@ export default function Dashboard(){
   const router=useRouter()
   const [user,setUser]=useState<any>(null)
   const [userData,setUserData]=useState<any>(null)
+  const [workspaces,setWorkspaces]=useState<any[]>([])
+  const [currentWs,setCurrentWs]=useState<any>(null)
   const [tab,setTab]=useState('inicio')
   const [modal,setModal]=useState<any>(null)
   const [authLoading,setAuthLoading]=useState(true)
 
+  async function loadUserAndWorkspaces(uid:string){
+    const{data:userRow}=await sb.from('usuarios').select('*').eq('id',uid).single()
+    setUserData(userRow)
+    // Load workspaces where user is member
+    const{data:memberships}=await sb.from('workspace_members').select('workspace_id,rol,workspaces(id,nombre,owner_id)').eq('usuario_id',uid).eq('estado','activo')
+    const wsList=(memberships||[]).map((m:any)=>({...m.workspaces,rol:m.rol})).filter((w:any)=>w&&w.id)
+    setWorkspaces(wsList)
+    // Use saved workspace or first one
+    const savedWs=typeof window!=='undefined'?localStorage.getItem('current_ws'):null
+    const ws=wsList.find((w:any)=>w.id===savedWs)||wsList[0]
+    if(ws)setCurrentWs(ws)
+  }
+
   useEffect(()=>{
-    // Handle implicit flow (token in hash)
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
-      // Let Supabase parse the hash
       sb.auth.getSession().then(async({data:{session}})=>{
         if(session){
           setUser(session.user)
-          const{data}=await sb.from('usuarios').select('*').eq('id',session.user.id).single()
-          setUserData(data)
+          await loadUserAndWorkspaces(session.user.id)
           setAuthLoading(false)
-          // Clean the URL
           window.history.replaceState(null,'','/dashboard')
         } else {
-          // Try to set session from hash
           sb.auth.onAuthStateChange(async(event, session) => {
             if(session){
               setUser(session.user)
-              const{data}=await sb.from('usuarios').select('*').eq('id',session.user.id).single()
-              setUserData(data)
+              await loadUserAndWorkspaces(session.user.id)
               setAuthLoading(false)
               window.history.replaceState(null,'','/dashboard')
             } else {
@@ -534,13 +554,16 @@ export default function Dashboard(){
     sb.auth.getSession().then(async({data:{session}})=>{
       if(!session){router.push('/');return}
       setUser(session.user)
-      const{data}=await sb.from('usuarios').select('*').eq('id',session.user.id).single()
-      setUserData(data)
+      await loadUserAndWorkspaces(session.user.id)
       setAuthLoading(false)
     })
   },[])
 
-  const store=useAppData(user?.id||'')
+  useEffect(()=>{
+    if(currentWs?.id&&typeof window!=='undefined')localStorage.setItem('current_ws',currentWs.id)
+  },[currentWs])
+
+  const store=useAppData(currentWs?.id||'', user?.id||'')
   const {props,inqs,contratos,pagos,vars,gastos,grupos,owners,loading}=store
 
   const logout=async()=>{await sb.auth.signOut();router.push('/')}
@@ -556,6 +579,8 @@ export default function Dashboard(){
     {id:'vars',ico:'📈',lbl:'Variables'},
     {id:'gastos',ico:'🔧',lbl:'Gastos'},
     {id:'reporte',ico:'📊',lbl:'Reporte'},
+    {id:'equipo',ico:'👥',lbl:'Equipo'},
+    {id:'importar',ico:'📥',lbl:'Importar'},
   ]
 
   if(authLoading)return(
@@ -890,6 +915,8 @@ export default function Dashboard(){
       case 'vars':return renderVars()
       case 'gastos':return renderGastos()
       case 'reporte':return renderReporte()
+      case 'equipo':return <RenderEquipo workspace={currentWs} userId={user?.id} workspaces={workspaces} setWorkspaces={setWorkspaces} setCurrentWs={setCurrentWs}/>
+      case 'importar':return <RenderImportar store={store}/>
       default:return renderInicio()
     }
   }
@@ -907,13 +934,17 @@ export default function Dashboard(){
   return(
     <div style={{minHeight:'100vh',background:'#f9fafb',maxWidth:480,margin:'0 auto'}}>
       {/* NAV */}
-      <nav style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 8px',height:56}}>
-        <div style={{flex:1,textAlign:'center',fontWeight:800,fontSize:18,color:'#1e3a8a'}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'4px 10px',borderRadius:20,fontSize:12,fontWeight:600}}>{diasTrial}d trial</div>}
-          <button onClick={()=>router.push('/planes')} style={{background:'#16a34a',color:'white',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}}>
-            {userData?.suscripcion_estado==='activa'?'Mi plan':'Suscribirse'}
-          </button>
+      <nav style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 8px',height:56,gap:6}}>
+        <div style={{fontWeight:800,fontSize:16,color:'#1e3a8a',whiteSpace:'nowrap'}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
+        {workspaces.length>0&&<select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{flex:1,maxWidth:160,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:12,fontWeight:600,outline:'none'}}>
+          {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}{w.rol==='owner'?'':' (compartido)'}</option>)}
+        </select>}
+        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
+          {userData?.es_superadmin&&<div style={{background:'#7c3aed',color:'white',padding:'3px 8px',borderRadius:20,fontSize:10,fontWeight:700}}>ADMIN</div>}
+          {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>{diasTrial}d trial</div>}
+          {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{background:'#16a34a',color:'white',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>
+            {userData?.suscripcion_estado==='activa'?'Plan':'Suscribirse'}
+          </button>}
           <button onClick={logout} style={{width:30,height:30,borderRadius:'50%',background:'#dbeafe',color:'#1e3a8a',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>{ini}</button>
         </div>
       </nav>
@@ -1027,4 +1058,210 @@ function GastoForm({props,onSave,onClose}:any){
     <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok)onSave({...d,monto:parseFloat(d.monto),fecha:new Date().toISOString().slice(0,10)})}}>Guardar gasto</button>
     <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
   </>)
+}
+
+
+// ─── TAB EQUIPO ───────────────────────────────
+function RenderEquipo({workspace, userId, workspaces, setWorkspaces, setCurrentWs}:any){
+  const [members,setMembers]=useState<any[]>([])
+  const [email,setEmail]=useState('')
+  const [loading,setLoading]=useState(false)
+  const [msg,setMsg]=useState('')
+  const [newWsName,setNewWsName]=useState('')
+  const isOwner=workspace?.owner_id===userId
+
+  async function loadMembers(){
+    if(!workspace)return
+    const{data}=await sb.from('workspace_members').select('id,rol,estado,usuario_id,invited_email,usuarios(email,nombre)').eq('workspace_id',workspace.id)
+    setMembers(data||[])
+  }
+
+  useEffect(()=>{loadMembers()},[workspace?.id])
+
+  async function invitar(){
+    if(!email)return
+    setLoading(true);setMsg('')
+    const{data,error}=await sb.rpc('invitar_miembro',{p_workspace_id:workspace.id,p_email:email})
+    setLoading(false)
+    if(error){setMsg('Error: '+error.message);return}
+    if(data?.ok){
+      setMsg(data.pendiente?'Invitación enviada. La persona debe registrarse con ese email.':'¡Miembro agregado!')
+      setEmail('')
+      loadMembers()
+    } else setMsg('Error: '+(data?.error||'desconocido'))
+  }
+
+  async function quitar(memberId:string){
+    if(!confirm('¿Quitar a este miembro?'))return
+    await sb.from('workspace_members').delete().eq('id',memberId)
+    loadMembers()
+  }
+
+  async function crearWs(){
+    if(!newWsName.trim())return
+    const{data,error}=await sb.from('workspaces').insert({nombre:newWsName.trim(),owner_id:userId}).select().single()
+    if(error){alert('Error: '+error.message);return}
+    if(data){
+      await sb.from('workspace_members').insert({workspace_id:data.id,usuario_id:userId,rol:'owner',estado:'activo'})
+      setWorkspaces([...workspaces,{...data,rol:'owner'}])
+      setCurrentWs({...data,rol:'owner'})
+      setNewWsName('')
+    }
+  }
+
+  return(
+    <div style={{padding:14}}>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>Workspace actual</p>
+      <div style={{...S.card}}>
+        <div style={{fontWeight:700,fontSize:15}}>{workspace?.nombre||'—'}</div>
+        <div style={{fontSize:12,color:'#6b7280',marginTop:2}}>{isOwner?'Sos el dueño de este espacio':'Compartido contigo'}</div>
+      </div>
+
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 9px'}}>Miembros ({members.length})</p>
+      {members.map((m:any)=>(
+        <div key={m.id} style={{...S.card,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:14}}>{m.usuarios?.nombre||m.usuarios?.email||m.invited_email||'Pendiente'}</div>
+            <div style={{fontSize:12,color:'#6b7280'}}>
+              {m.rol==='owner'?'👑 Dueño':'✏️ Editor'}
+              {m.estado==='pendiente'&&' · ⏳ Esperando registro'}
+            </div>
+          </div>
+          {isOwner&&m.rol!=='owner'&&<button onClick={()=>quitar(m.id)} style={{background:'#fee2e2',color:'#7f1d1d',padding:'5px 10px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Quitar</button>}
+        </div>
+      ))}
+
+      {isOwner&&<>
+        <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 9px'}}>Invitar a alguien</p>
+        <div style={{...S.card}}>
+          <div style={{fontSize:12,color:'#6b7280',marginBottom:8}}>La persona debe tener cuenta de Google. Si todavía no se registró, dejará la invitación pendiente.</div>
+          <div style={S.fg}><label style={S.lbl}>Email</label><input style={S.inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ejemplo@gmail.com"/></div>
+          <button style={{...S.btnP,opacity:email?1:.5}} disabled={!email||loading} onClick={invitar}>{loading?'Enviando...':'Invitar'}</button>
+          {msg&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginTop:8,background:msg.startsWith('Error')?'#fee2e2':'#dcfce7',color:msg.startsWith('Error')?'#7f1d1d':'#14532d'}}>{msg}</div>}
+        </div>
+      </>}
+
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 9px'}}>Crear otro workspace</p>
+      <div style={{...S.card}}>
+        <div style={{fontSize:12,color:'#6b7280',marginBottom:8}}>Útil si querés separar datos de distintos clientes o proyectos.</div>
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={newWsName} onChange={e=>setNewWsName(e.target.value)} placeholder="Ej: Edificio Belgrano"/></div>
+        <button style={{...S.btnS,opacity:newWsName?1:.5}} disabled={!newWsName} onClick={crearWs}>+ Crear workspace</button>
+      </div>
+      <div style={{height:70}}/>
+    </div>
+  )
+}
+
+// ─── TAB IMPORTAR ─────────────────────────────
+function RenderImportar({store}:any){
+  const [tab,setTab]=useState<'json'|'csv'>('json')
+  const [msg,setMsg]=useState('')
+  const fileRef=useRef<HTMLInputElement>(null)
+
+  async function handleJSON(file:File){
+    setMsg('Procesando...')
+    try{
+      const text=await file.text()
+      const data=JSON.parse(text)
+      let count=0
+      if(data.propiedades?.length){
+        const items=data.propiedades.map((p:any)=>{const{id,usuario_id,workspace_id,created_at,...rest}=p;return rest})
+        const r=await store.bulkImport(items,'propiedades');count+=r.count
+      }
+      if(data.inquilinos?.length){
+        const items=data.inquilinos.map((p:any)=>{const{id,usuario_id,workspace_id,created_at,...rest}=p;return rest})
+        const r=await store.bulkImport(items,'inquilinos');count+=r.count
+      }
+      if(data.grupos?.length){
+        const items=data.grupos.map((p:any)=>{const{id,usuario_id,workspace_id,created_at,...rest}=p;return rest})
+        const r=await store.bulkImport(items,'grupos');count+=r.count
+      }
+      if(data.propietarios?.length){
+        const items=data.propietarios.map((p:any)=>{const{id,usuario_id,workspace_id,created_at,...rest}=p;return rest})
+        const r=await store.bulkImport(items,'propietarios');count+=r.count
+      }
+      setMsg(`✓ Importados ${count} registros correctamente`)
+    } catch(e:any){
+      setMsg('Error: '+e.message)
+    }
+  }
+
+  async function handleCSV(file:File){
+    setMsg('Procesando...')
+    try{
+      const text=await file.text()
+      const lines=text.split(/\r?\n/).filter((l:string)=>l.trim())
+      if(lines.length<2){setMsg('El archivo está vacío');return}
+      const headers=lines[0].split(',').map((h:string)=>h.trim().toLowerCase())
+      const items=[]
+      for(let i=1;i<lines.length;i++){
+        const vals=lines[i].split(',').map((v:string)=>v.trim())
+        const row:any={}
+        headers.forEach((h:string,j:number)=>{
+          row[h]=vals[j]||''
+        })
+        const item:any={
+          codigo:row.codigo||row.cod||`P${i}`,
+          nombre:row.nombre||row.name||`Propiedad ${i}`,
+          direccion:row.direccion||row.address||'',
+          ciudad:row.ciudad||row.city||'Yerba Buena',
+          tipo:row.tipo||row.type||'local',
+          superficie:parseFloat(row.superficie||row.m2||row.metros||'0')||null,
+          observaciones:row.observaciones||row.notas||'',
+          activo:true,
+          valor_compra:parseFloat(row.valor_compra||row.valor||'0')||0
+        }
+        items.push(item)
+      }
+      const r=await store.bulkImport(items,'propiedades')
+      if(r.error)setMsg('Error: '+r.error.message)
+      else setMsg(`✓ Importadas ${r.count} propiedades`)
+    } catch(e:any){
+      setMsg('Error: '+e.message)
+    }
+  }
+
+  function onFile(e:any){
+    const f=e.target.files?.[0]
+    if(!f)return
+    if(tab==='json')handleJSON(f)
+    else handleCSV(f)
+  }
+
+  return(
+    <div style={{padding:14}}>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>Importar datos</p>
+      <div style={{display:'flex',gap:6,marginBottom:11}}>
+        <button onClick={()=>setTab('json')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${tab==='json'?'#2563eb':'#e5e7eb'}`,background:tab==='json'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:tab==='json'?'#2563eb':'#6b7280',cursor:'pointer'}}>Backup JSON</button>
+        <button onClick={()=>setTab('csv')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${tab==='csv'?'#2563eb':'#e5e7eb'}`,background:tab==='csv'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:tab==='csv'?'#2563eb':'#6b7280',cursor:'pointer'}}>CSV propiedades</button>
+      </div>
+
+      {tab==='json'&&<div style={{...S.card}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:6}}>Restaurar desde backup</div>
+        <div style={{fontSize:12,color:'#6b7280',marginBottom:10}}>Subí un archivo JSON exportado desde la pestaña Reporte. Se importarán propiedades, inquilinos, grupos y propietarios.</div>
+        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:10,background:'#fef3c7',color:'#78350f'}}>
+          ⚠️ Los datos se agregarán a los existentes. Si querés empezar de cero, primero borrá los datos viejos.
+        </div>
+      </div>}
+
+      {tab==='csv'&&<div style={{...S.card}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:6}}>Importar propiedades desde CSV</div>
+        <div style={{fontSize:12,color:'#6b7280',marginBottom:10}}>El archivo debe tener las siguientes columnas en la primera fila:</div>
+        <div style={{background:'#f3f4f6',padding:10,borderRadius:8,fontFamily:'monospace',fontSize:11,color:'#111827',marginBottom:10,overflow:'auto'}}>
+          codigo,nombre,direccion,ciudad,tipo,superficie,observaciones,valor_compra
+        </div>
+        <div style={{fontSize:12,color:'#6b7280',marginBottom:10}}>
+          <strong>Tipos válidos:</strong> local, depto, terreno, otro<br/>
+          <strong>Ejemplo de fila:</strong><br/>
+          <span style={{fontFamily:'monospace',fontSize:11}}>HL01,Punto Heller L1,Av. Aconquija 1234,Yerba Buena,local,80,,150000000</span>
+        </div>
+        <a href={"data:text/csv;charset=utf-8,"+encodeURIComponent("codigo,nombre,direccion,ciudad,tipo,superficie,observaciones,valor_compra\nHL01,Ejemplo Local,Av. Aconquija 1234,Yerba Buena,local,80,,150000000")} download="plantilla_propiedades.csv" style={{display:'inline-block',background:'#dbeafe',color:'#2563eb',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,textDecoration:'none',marginBottom:10}}>⬇ Descargar plantilla CSV</a>
+      </div>}
+
+      <input type="file" accept={tab==='json'?'.json':'.csv'} ref={fileRef} onChange={onFile} style={{display:'none'}}/>
+      <button style={S.btnP} onClick={()=>fileRef.current?.click()}>📁 Seleccionar archivo</button>
+      {msg&&<div style={{padding:'10px 12px',borderRadius:9,fontSize:13,marginTop:9,background:msg.startsWith('Error')?'#fee2e2':msg.startsWith('✓')?'#dcfce7':'#dbeafe',color:msg.startsWith('Error')?'#7f1d1d':msg.startsWith('✓')?'#14532d':'#1e3a8a'}}>{msg}</div>}
+      <div style={{height:70}}/>
+    </div>
+  )
 }
