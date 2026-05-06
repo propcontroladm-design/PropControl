@@ -1,152 +1,177 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
+
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 const PLANES = [
   {
     id: 'starter',
     nombre: 'Starter',
     precio: 9900,
-    descripcion: 'Hasta 10 propiedades',
-    features: ['Hasta 10 propiedades','Contratos y pagos','Inquilinos ilimitados','Reportes básicos','Soporte por email'],
-    popular: false,
-    mp_plan_id: '' // Se completa con el ID real de MercadoPago
+    periodo: '/mes',
+    desc: 'Hasta 10 propiedades',
+    mp_plan_id: '7302efeb23354c44b9680cdab2545cd6',
+    features: [
+      'Hasta 10 propiedades',
+      'Contratos y pagos',
+      'Inquilinos ilimitados',
+      'Reportes básicos',
+      'Soporte por email',
+    ],
+    pop: false,
   },
   {
     id: 'pro',
     nombre: 'Pro',
     precio: 19900,
-    descripcion: 'Propiedades ilimitadas',
-    features: ['Propiedades ilimitadas','Todo lo del Starter','ROI y rentabilidad','Expensas por edificio','Propietarios múltiples','Índices personalizados','WhatsApp automático','Soporte prioritario'],
-    popular: true,
-    mp_plan_id: '' // Se completa con el ID real de MercadoPago
+    periodo: '/mes',
+    desc: 'Propiedades ilimitadas',
+    mp_plan_id: '098474a629c04308849afc155db0be49',
+    features: [
+      'Propiedades ilimitadas',
+      'Todo lo del Starter',
+      'ROI y rentabilidad',
+      'Expensas por edificio',
+      'Propietarios múltiples',
+      'WhatsApp automático',
+      'Soporte prioritario',
+    ],
+    pop: true,
   },
   {
     id: 'pro_anual',
     nombre: 'Pro Anual',
     precio: 179900,
-    descripcion: 'Ahorrás 2 meses',
-    features: ['Todo lo del plan Pro','Precio fijo todo el año','Factura anual'],
-    popular: false,
-    mp_plan_id: '' // Se completa con el ID real de MercadoPago
-  }
+    periodo: '/año',
+    desc: 'Ahorrás 2 meses',
+    mp_plan_id: 'bdb7f64dc25c49a2bee8e7198b43e106',
+    features: [
+      'Todo lo del plan Pro',
+      'Precio fijo todo el año',
+      '2 meses gratis',
+      'Factura anual',
+    ],
+    pop: false,
+  },
 ]
 
 export default function Planes() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [userData, setUserData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [planSeleccionado, setPlanSeleccionado] = useState<string | null>(null)
+  const [loading, setLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { router.push('/'); return }
+    sb.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push('/')
+        return
+      }
       setUser(session.user)
-      const { data } = await supabase.from('usuarios').select('*').eq('id', session.user.id).single()
+      const { data } = await sb.from('usuarios').select('*').eq('id', session.user.id).single()
       setUserData(data)
     })
   }, [])
 
-  const suscribirse = async (planId: string) => {
-    if (!user) { router.push('/'); return }
-    setPlanSeleccionado(planId)
-    setLoading(true)
-
+  async function suscribirse(plan: any) {
+    if (!user) return
+    setLoading(plan.id)
     try {
-      const res = await fetch('/api/subscription/create', {
+      const r = await fetch('/api/subscription/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, userId: user.id, email: user.email })
+        body: JSON.stringify({
+          plan_id: plan.id,
+          mp_plan_id: plan.mp_plan_id,
+          email: user.email,
+          user_id: user.id,
+        }),
       })
-      const data = await res.json()
+      const data = await r.json()
       if (data.init_point) {
         window.location.href = data.init_point
       } else {
-        alert('Error al crear la suscripción. Intentá de nuevo.')
+        alert('Error: ' + (data.error || 'No se pudo crear la suscripción'))
+        setLoading(null)
       }
-    } catch (e) {
-      alert('Error de conexión. Intentá de nuevo.')
+    } catch (e: any) {
+      alert('Error: ' + e.message)
+      setLoading(null)
     }
-    setLoading(false)
   }
 
+  const diasTrial = userData
+    ? Math.max(0, Math.ceil((new Date(userData.trial_fin).getTime() - Date.now()) / 86400000))
+    : 0
+
   return (
-    <div style={{minHeight:'100vh',background:'#f9fafb'}}>
-      <nav style={{background:'white',borderBottom:'1px solid #e5e7eb',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:60}}>
-        <span style={{fontWeight:800,fontSize:18,color:'#1e3a8a',cursor:'pointer'}} onClick={() => router.push('/dashboard')}>
-          Prop<span style={{color:'#16a344'}}>Control</span>
-        </span>
-        {user && (
-          <button onClick={() => router.push('/dashboard')} style={{background:'#f3f4f6',color:'#374151',padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:600}}>
-            ← Volver al dashboard
-          </button>
-        )}
+    <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
+      <nav style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <a href="/dashboard" style={{ color: '#2563eb', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>← Dashboard</a>
+        <span style={{ fontWeight: 800, fontSize: 17, color: '#1e3a8a' }}>Prop<span style={{ color: '#16a34a' }}>Control</span></span>
+        <div style={{ width: 80 }} />
       </nav>
 
-      <div style={{maxWidth:900,margin:'0 auto',padding:'60px 24px'}}>
-        <h1 style={{textAlign:'center',fontSize:36,fontWeight:800,color:'#1e3a8a',marginBottom:12}}>Elegí tu plan</h1>
-        <p style={{textAlign:'center',color:'#6b7280',fontSize:16,marginBottom:48}}>
-          {userData?.suscripcion_estado === 'trial'
-            ? `Te quedan ${Math.max(0, Math.ceil((new Date(userData.trial_fin).getTime() - Date.now()) / 86400000))} días de prueba`
-            : 'Sin sorpresas. Cancelás cuando querés.'}
+      <div style={{ maxWidth: 980, margin: '0 auto', padding: '40px 20px' }}>
+        <h1 style={{ textAlign: 'center', fontSize: 32, fontWeight: 900, color: '#1e3a8a', marginBottom: 8 }}>Elegí tu plan</h1>
+        <p style={{ textAlign: 'center', color: '#6b7280', fontSize: 15, marginBottom: 30 }}>
+          {userData?.suscripcion_estado === 'trial' && diasTrial > 0
+            ? `Te quedan ${diasTrial} días de prueba gratis`
+            : userData?.suscripcion_estado === 'activa'
+            ? 'Tu suscripción está activa'
+            : 'Suscribite para seguir usando PropControl'}
         </p>
 
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:24}}>
-          {PLANES.map(plan => (
-            <div key={plan.id} style={{
-              background: plan.popular ? 'linear-gradient(135deg,#1e3a8a,#2563eb)' : 'white',
-              borderRadius:20,padding:28,
-              border: plan.popular ? '2px solid #2563eb' : '2px solid #e5e7eb',
-              boxShadow: plan.popular ? '0 8px 32px rgba(30,58,138,0.25)' : '0 2px 8px rgba(0,0,0,0.06)',
-              position:'relative'
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
+          {PLANES.map((pl) => (
+            <div key={pl.id} style={{
+              background: pl.pop ? 'linear-gradient(135deg,#1e3a8a,#2563eb)' : 'white',
+              borderRadius: 18,
+              padding: 24,
+              border: pl.pop ? '2px solid #2563eb' : '2px solid #e5e7eb',
+              boxShadow: pl.pop ? '0 8px 32px rgba(30,58,138,0.25)' : '0 2px 8px rgba(0,0,0,0.06)',
+              position: 'relative',
             }}>
-              {plan.popular && (
-                <div style={{position:'absolute',top:-12,left:'50%',transform:'translateX(-50%)',background:'#16a344',color:'white',padding:'4px 14px',borderRadius:20,fontSize:12,fontWeight:700,whiteSpace:'nowrap'}}>
-                  MÁS POPULAR
-                </div>
-              )}
-              <div style={{fontWeight:700,fontSize:12,color:plan.popular?'rgba(255,255,255,0.6)':'#6b7280',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
-                {plan.nombre}
+              {pl.pop && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#16a344', color: 'white', padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>MÁS POPULAR</div>}
+              <div style={{ fontWeight: 700, fontSize: 12, color: pl.pop ? 'rgba(255,255,255,0.6)' : '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{pl.nombre}</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: pl.pop ? 'white' : '#1e3a8a', marginBottom: 4 }}>
+                ${pl.precio.toLocaleString('es-AR')}<span style={{ fontSize: 14, fontWeight: 400, color: pl.pop ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>{pl.periodo}</span>
               </div>
-              <div style={{fontSize:38,fontWeight:900,color:plan.popular?'white':'#1e3a8a',marginBottom:4}}>
-                ${plan.precio.toLocaleString('es-AR')}
-                <span style={{fontSize:14,fontWeight:400,color:plan.popular?'rgba(255,255,255,0.6)':'#6b7280'}}>
-                  {plan.id === 'pro_anual' ? '/año' : '/mes'}
-                </span>
-              </div>
-              <p style={{color:plan.popular?'rgba(255,255,255,0.7)':'#6b7280',fontSize:13,marginBottom:20}}>
-                {plan.descripcion}
-              </p>
-              <ul style={{listStyle:'none',marginBottom:24}}>
-                {plan.features.map((f, i) => (
-                  <li key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:9,fontSize:13,color:plan.popular?'rgba(255,255,255,0.9)':'#374151'}}>
-                    <span style={{color:plan.popular?'#86efac':'#16a344',fontWeight:700,flexShrink:0}}>✓</span>{f}
+              <p style={{ color: pl.pop ? 'rgba(255,255,255,0.7)' : '#6b7280', fontSize: 13, marginBottom: 20 }}>{pl.desc}</p>
+              <ul style={{ listStyle: 'none', marginBottom: 24, padding: 0 }}>
+                {pl.features.map((f, j) => (
+                  <li key={j} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 13, color: pl.pop ? 'rgba(255,255,255,0.9)' : '#374151' }}>
+                    <span style={{ color: pl.pop ? '#86efac' : '#16a344', fontWeight: 700 }}>✓</span>{f}
                   </li>
                 ))}
               </ul>
-              <button
-                onClick={() => suscribirse(plan.id)}
-                disabled={loading && planSeleccionado === plan.id}
-                style={{
-                  width:'100%',
-                  background: plan.popular ? '#16a344' : '#1e3a8a',
-                  color:'white',
-                  padding:'12px',borderRadius:10,fontWeight:700,fontSize:15,cursor:'pointer',
-                  opacity: loading && planSeleccionado === plan.id ? 0.7 : 1,
-                  boxShadow: plan.popular ? '0 4px 12px rgba(22,163,68,0.4)' : 'none'
-                }}
-              >
-                {loading && planSeleccionado === plan.id ? 'Procesando...' : 'Suscribirme'}
+              <button onClick={() => suscribirse(pl)} disabled={loading !== null} style={{
+                width: '100%',
+                background: pl.pop ? '#16a344' : '#1e3a8a',
+                color: 'white',
+                padding: '13px',
+                borderRadius: 10,
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: loading ? 'wait' : 'pointer',
+                border: 'none',
+                opacity: loading && loading !== pl.id ? 0.5 : 1,
+              }}>
+                {loading === pl.id ? 'Conectando...' : 'Suscribirme'}
               </button>
             </div>
           ))}
         </div>
 
-        <p style={{textAlign:'center',color:'#9ca3af',fontSize:13,marginTop:32}}>
-          Pagos procesados de forma segura por MercadoPago · Cancelás en cualquier momento
-        </p>
+        <div style={{ marginTop: 30, padding: 16, background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
+          <p style={{ marginBottom: 6 }}>💳 Pago seguro vía MercadoPago</p>
+          <p>Podés cancelar tu suscripción en cualquier momento desde tu panel.</p>
+        </div>
       </div>
     </div>
   )
