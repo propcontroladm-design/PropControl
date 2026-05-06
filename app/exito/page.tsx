@@ -1,10 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function Exito() {
+function ExitoContent() {
   const router = useRouter()
-  const params = useSearchParams()
   const [count, setCount] = useState(5)
 
   useEffect(() => {
@@ -32,5 +31,13 @@ export default function Exito() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function Exito() {
+  return (
+    <Suspense fallback={<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>Cargando...</div>}>
+      <ExitoContent />
+    </Suspense>
   )
 }
