@@ -714,13 +714,21 @@ export default function Dashboard(){
 
   // ── TAB PROPS ───────────────────────────────
   const renderProps=()=>(
-    <div style={{padding:14}}>
-      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{props.length} propiedades</p>
-      {props.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}><div style={{fontSize:40,marginBottom:8}}>🏢</div><div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin propiedades</div><div style={{fontSize:13}}>Tocá + para agregar</div></div>}
+    <div style={{padding:'18px 14px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div>
+          <h2 style={{fontSize:22,fontWeight:800,color:'#0f172a',margin:0}}>Propiedades</h2>
+          <p style={{fontSize:13,color:'#64748b',margin:'2px 0 0'}}>{props.length} propiedad{props.length!==1?'es':''}{grupos.length>0?` · ${grupos.length} grupos`:''}</p>
+        </div>
+        <button onClick={()=>setModal({type:'prop',data:null})} style={{background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',padding:'9px 16px',borderRadius:10,fontSize:13,fontWeight:700,border:'none',cursor:'pointer',boxShadow:'0 4px 10px rgba(37,99,235,.25)'}}>+ Nueva</button>
+      </div>
+      {props.length===0&&<div style={{textAlign:'center',padding:'60px 20px',color:'#64748b',background:'white',borderRadius:14,border:'1px solid #e5e7eb'}}><div style={{fontSize:48,marginBottom:12}}>🏢</div><div style={{fontSize:16,fontWeight:600,color:'#0f172a',marginBottom:6}}>Sin propiedades</div><div style={{fontSize:13}}>Tocá "Nueva" para agregar la primera</div></div>}
+      <div className="pc-grid-2">
       {props.map((p:any)=>{
         const aa=contratos.find(c=>c.propiedad_id===p.id&&c.activo!==false)
+        const grupo=grupos.find((g:any)=>g.id===p.grupo_id)
         return(
-          <div key={p.id} style={S.card}>
+          <div key={p.id} className="card-hover" style={{...S.card,marginBottom:0,cursor:'default'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#2563eb'}}>{p.codigo}</div>
@@ -732,13 +740,15 @@ export default function Dashboard(){
             </div>
             {p.observaciones&&<div style={{fontSize:12,color:'#6b7280',marginTop:5,borderTop:'1px solid #e5e7eb',paddingTop:5}}>{p.observaciones}</div>}
             <div style={{marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              {aa?<span style={{fontSize:12,background:'#dcfce7',color:'#14532d',padding:'2px 8px',borderRadius:10,fontWeight:700}}>● En alquiler</span>:<span style={{fontSize:12,background:'#f3f4f6',color:'#6b7280',padding:'2px 8px',borderRadius:10}}>Disponible</span>}
-              <button style={{background:'none',border:'none',color:'#2563eb',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setModal({type:'prop',data:p})}>Editar</button>
+              {aa?<span style={{fontSize:12,background:'#dcfce7',color:'#14532d',padding:'3px 10px',borderRadius:20,fontWeight:700}}>● En alquiler</span>:<span style={{fontSize:12,background:'#f3f4f6',color:'#64748b',padding:'3px 10px',borderRadius:20}}>Disponible</span>}
+              <button style={{background:'none',border:'none',color:'#2563eb',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setModal({type:'prop',data:p})}>Editar →</button>
             </div>
+            {grupo&&<div style={{marginTop:6,padding:'4px 8px',background:'#f3f4f6',borderRadius:7,fontSize:11,color:'#475569'}}>🏘️ {grupo.nombre} · {p.pct_expensas||0}% expensas</div>}
           </div>
         )
       })}
-      <div style={{height:70}}/>
+      </div>
+      <div style={{height:80}}/>
     </div>
   )
 
@@ -983,37 +993,123 @@ export default function Dashboard(){
   const ini=(user?.email||'?')[0].toUpperCase()
 
   return(
-    <div style={{minHeight:'100vh',background:'#f9fafb',maxWidth:480,margin:'0 auto'}}>
-      {/* NAV */}
-      <nav style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 8px',height:56,gap:6}}>
-        <div style={{fontWeight:800,fontSize:16,color:'#1e3a8a',whiteSpace:'nowrap'}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
-        {workspaces.length>0&&<select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{flex:1,maxWidth:160,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:12,fontWeight:600,outline:'none'}}>
-          {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}{w.rol==='owner'?'':' (compartido)'}</option>)}
-        </select>}
-        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
-          {userData?.es_superadmin&&<div style={{background:'#7c3aed',color:'white',padding:'3px 8px',borderRadius:20,fontSize:10,fontWeight:700}}>ADMIN</div>}
-          {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>{diasTrial}d trial</div>}
-          {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{background:'#16a34a',color:'white',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>
-            {userData?.suscripcion_estado==='activa'?'Plan':'Suscribirse'}
-          </button>}
-          <button onClick={logout} style={{width:30,height:30,borderRadius:'50%',background:'#dbeafe',color:'#1e3a8a',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>{ini}</button>
+    <>
+    <style jsx global>{`
+      :root { --primary: #2563eb; --primary-dark: #1e3a8a; --success: #16a34a; --bg: #f8fafc; --surface: #ffffff; --border: #e5e7eb; --text: #0f172a; --text-muted: #64748b; }
+      * { box-sizing: border-box; }
+      body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; -webkit-font-smoothing: antialiased; }
+      button { transition: all 0.15s ease; }
+      button:hover:not(:disabled) { transform: translateY(-1px); }
+      .card-hover { transition: all 0.2s ease; }
+      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08) !important; }
+      
+      /* Layout responsive */
+      .pc-layout { min-height: 100vh; background: var(--bg); }
+      .pc-sidebar { display: none; }
+      .pc-mobile-tabs { display: flex; }
+      .pc-content-wrap { padding: 0; }
+      
+      @media (min-width: 768px) {
+        .pc-layout { display: flex; }
+        .pc-sidebar { display: flex; flex-direction: column; width: 220px; background: white; border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; padding: 16px 12px; flex-shrink: 0; overflow-y: auto; }
+        .pc-mobile-tabs { display: none; }
+        .pc-mobile-nav { display: none; }
+        .pc-content-wrap { flex: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+      }
+      
+      .pc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+      @media (min-width: 640px) { .pc-grid-2 { grid-template-columns: repeat(2, 1fr); } }
+      @media (min-width: 1024px) { .pc-grid-2 { grid-template-columns: repeat(2, 1fr); } }
+      
+      .pc-grid-3 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+      @media (min-width: 640px) { .pc-grid-3 { grid-template-columns: repeat(2, 1fr); } }
+      @media (min-width: 1024px) { .pc-grid-3 { grid-template-columns: repeat(3, 1fr); } }
+    `}</style>
+    
+    <div className="pc-layout">
+      {/* SIDEBAR (desktop) */}
+      <aside className="pc-sidebar">
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'4px 8px',marginBottom:18}}>
+          <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#2563eb,#16a344)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:18,boxShadow:'0 4px 10px rgba(37,99,235,.3)'}}>P</div>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:'#1e3a8a',lineHeight:1}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
+            <div style={{fontSize:10,color:'#64748b',marginTop:2}}>v2.0</div>
+          </div>
         </div>
-      </nav>
+        
+        {workspaces.length>0&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:1,marginBottom:5,padding:'0 8px'}}>Workspace</div>
+          <select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{width:'100%',padding:'8px 10px',border:'1.5px solid #e5e7eb',borderRadius:9,fontSize:12,fontWeight:600,outline:'none',background:'#f8fafc'}}>
+            {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}{w.rol==='owner'?'':' 🤝'}</option>)}
+          </select>
+        </div>}
+        
+        <nav style={{flex:1,overflowY:'auto'}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:2,borderRadius:9,
+              background:tab===t.id?'#dbeafe':'transparent',color:tab===t.id?'#2563eb':'#475569',
+              fontSize:13,fontWeight:tab===t.id?700:500,border:'none',cursor:'pointer',textAlign:'left'
+            }}>
+              <span style={{fontSize:16,width:18,textAlign:'center'}}>{t.ico}</span>
+              <span>{t.lbl}</span>
+            </button>
+          ))}
+        </nav>
+        
+        <div style={{borderTop:'1px solid #e5e7eb',paddingTop:10,marginTop:10}}>
+          {userData?.es_superadmin&&<div style={{display:'inline-block',background:'linear-gradient(135deg,#7c3aed,#a855f7)',color:'white',padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:700,marginBottom:8}}>✦ ADMIN</div>}
+          {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:600,marginBottom:8,textAlign:'center'}}>⏳ {diasTrial} días de trial</div>}
+          {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{width:'100%',background:userData?.suscripcion_estado==='activa'?'#dcfce7':'#16a34a',color:userData?.suscripcion_estado==='activa'?'#14532d':'white',padding:'8px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',cursor:'pointer',marginBottom:8}}>
+            {userData?.suscripcion_estado==='activa'?'✓ Plan activo':'Suscribirse'}
+          </button>}
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px',borderRadius:8,background:'#f8fafc'}}>
+            <div style={{width:30,height:30,borderRadius:'50%',background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,flexShrink:0}}>{ini}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user?.email}</div>
+            </div>
+            <button onClick={logout} title="Cerrar sesión" style={{background:'none',border:'none',color:'#64748b',fontSize:14,cursor:'pointer',padding:4}}>↪</button>
+          </div>
+        </div>
+      </aside>
+      
+      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+        {/* MOBILE NAV */}
+        <nav className="pc-mobile-nav" style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 12px',height:54,gap:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div style={{width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#2563eb,#16a344)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:14}}>P</div>
+            <div style={{fontWeight:800,fontSize:15,color:'#1e3a8a'}}>Prop<span style={{color:'#16a344'}}>Control</span></div>
+          </div>
+          {workspaces.length>0&&<select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{flex:1,maxWidth:140,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:11,fontWeight:600,outline:'none'}}>
+            {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}</option>)}
+          </select>}
+          <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
+            {userData?.es_superadmin&&<div style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)',color:'white',padding:'3px 8px',borderRadius:20,fontSize:10,fontWeight:700}}>ADMIN</div>}
+            {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>{diasTrial}d</div>}
+            {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{background:'#16a344',color:'white',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>
+              {userData?.suscripcion_estado==='activa'?'Plan':'Plan'}
+            </button>}
+            <button onClick={logout} style={{width:30,height:30,borderRadius:'50%',background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>{ini}</button>
+          </div>
+        </nav>
 
-      {/* TABS */}
-      <div style={{display:'flex',background:'white',borderBottom:'1px solid #e5e7eb',overflowX:'auto',scrollbarWidth:'none'}}>
-        {TABS.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,minWidth:46,padding:'10px 2px 8px',textAlign:'center',fontSize:10,fontWeight:600,color:tab===t.id?'#2563eb':'#6b7280',borderBottom:`2px solid ${tab===t.id?'#2563eb':'transparent'}`,background:'none',border:'none',cursor:'pointer',whiteSpace:'nowrap'}}>
-            <span style={{display:'block',fontSize:16,marginBottom:2}}>{t.ico}</span>{t.lbl}
-          </button>
-        ))}
+        {/* MOBILE TABS */}
+        <div className="pc-mobile-tabs" style={{background:'white',borderBottom:'1px solid #e5e7eb',overflowX:'auto',scrollbarWidth:'none'}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{flexShrink:0,minWidth:62,padding:'10px 8px 8px',textAlign:'center',fontSize:10,fontWeight:tab===t.id?700:600,color:tab===t.id?'#2563eb':'#64748b',borderBottom:`2px solid ${tab===t.id?'#2563eb':'transparent'}`,background:'none',border:'none',cursor:'pointer',whiteSpace:'nowrap'}}>
+              <span style={{display:'block',fontSize:16,marginBottom:2}}>{t.ico}</span>{t.lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* CONTENT */}
+        <div className="pc-content-wrap">
+          {renderContent()}
+        </div>
       </div>
 
-      {/* CONTENT */}
-      {renderContent()}
-
       {/* FAB */}
-      {FAB_ACTIONS[tab]&&<button onClick={FAB_ACTIONS[tab]} style={{position:'fixed',bottom:19,right:15,width:52,height:52,background:'#2563eb',color:'white',borderRadius:26,fontSize:26,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 14px rgba(37,99,235,.4)',zIndex:150,border:'none',cursor:'pointer'}}>+</button>}
+      {FAB_ACTIONS[tab]&&<button onClick={FAB_ACTIONS[tab]} style={{position:'fixed',bottom:24,right:24,width:56,height:56,background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',borderRadius:28,fontSize:26,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(37,99,235,.4)',zIndex:150,border:'none',cursor:'pointer',fontWeight:300}}>+</button>}
 
       {/* MODALES */}
       {modal?.type==='pago'&&<ModalPago
@@ -1094,6 +1190,7 @@ export default function Dashboard(){
         onClose={()=>setModal(null)}
       />}
     </div>
+    </>
   )
 }
 
