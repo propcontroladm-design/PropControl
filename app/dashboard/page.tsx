@@ -240,7 +240,7 @@ function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel}:an
 }
 
 // ─── FORM PROPIEDAD ───────────────────────────
-function FormProp({ini,grupos,owners,onSave,onDelete,onClose}:any){
+function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
   const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0,propietarios:[]})
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const ok=d.nombre.trim()
@@ -263,13 +263,51 @@ function FormProp({ini,grupos,owners,onSave,onDelete,onClose}:any){
           <div style={{flex:1}}><label style={S.lbl}>Ciudad</label><input style={S.inp} value={d.ciudad} onChange={e=>up('ciudad',e.target.value)}/></div>
           <div style={{flex:1}}><label style={S.lbl}>m²</label><input style={S.inp} type="number" value={d.superficie} onChange={e=>up('superficie',e.target.value)}/></div>
         </div>
-        {grupos.length>0&&<div style={S.fg}><label style={S.lbl}>Grupo / Edificio</label>
-          <select style={S.sel} value={d.grupo_id||''} onChange={e=>up('grupo_id',e.target.value)}>
-            <option value="">— Sin grupo —</option>
-            {grupos.map((g:any)=><option key={g.id} value={g.id}>{g.nombre}</option>)}
-          </select>
-        </div>}
-        {d.grupo_id&&<div style={S.fg}><label style={S.lbl}>% Expensas del edificio</label><input style={S.inp} type="number" value={d.pct_expensas||''} onChange={e=>up('pct_expensas',parseFloat(e.target.value)||0)}/></div>}
+        {/* GRUPO con UX mejorado */}
+        <div style={{...S.fg,background:'#f8fafc',padding:12,borderRadius:11,border:'1px solid #e5e7eb',marginBottom:12}}>
+          <label style={{...S.lbl,marginBottom:6}}>🏘️ Grupo / Edificio</label>
+          {grupos.length===0?<div style={{padding:'10px 12px',borderRadius:9,fontSize:12,background:'#fef3c7',color:'#78350f',marginBottom:6}}>
+            Todavía no creaste grupos. Andá a la pestaña <strong>Grupos</strong> para crear uno (ej: "Edificio Belgrano") y volvé acá.
+          </div>:<>
+            <select style={{...S.sel,marginBottom:d.grupo_id?10:0}} value={d.grupo_id||''} onChange={e=>up('grupo_id',e.target.value)}>
+              <option value="">— Esta propiedad NO pertenece a un grupo —</option>
+              {grupos.map((g:any)=><option key={g.id} value={g.id}>📍 {g.nombre}{g.direccion?' · '+g.direccion:''}</option>)}
+            </select>
+            {d.grupo_id&&(()=>{
+              const grupoElegido=grupos.find((g:any)=>g.id===d.grupo_id)
+              const otrasProps=(propsList||[]).filter((p:any)=>p.grupo_id===d.grupo_id&&p.id!==ini?.id)
+              const pctOtras=otrasProps.reduce((s:number,p:any)=>s+(p.pct_expensas||0),0)
+              const pctActual=parseFloat(d.pct_expensas)||0
+              const total=pctOtras+pctActual
+              const restante=100-pctOtras
+              return(
+                <div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                    <label style={{...S.lbl,marginBottom:0,flex:1}}>% Expensas que le tocan a esta propiedad</label>
+                    <button type="button" onClick={()=>up('pct_expensas',Math.max(0,restante))} style={{background:'#dbeafe',color:'#2563eb',padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>Auto: {restante.toFixed(1)}%</button>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <input style={{...S.inp,flex:1}} type="number" step="0.01" placeholder="Ej: 25" value={d.pct_expensas||''} onChange={e=>up('pct_expensas',parseFloat(e.target.value)||0)}/>
+                    <span style={{fontSize:18,fontWeight:700,color:'#475569'}}>%</span>
+                  </div>
+                  {otrasProps.length>0&&<div style={{marginTop:10,padding:'10px 12px',background:'white',borderRadius:9,border:'1px solid #e5e7eb'}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'#64748b',marginBottom:6}}>Otras propiedades en {grupoElegido?.nombre}:</div>
+                    {otrasProps.map((p:any)=>(
+                      <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                        <span>{p.codigo} · {p.nombre}</span>
+                        <span style={{fontWeight:700,color:'#475569'}}>{p.pct_expensas||0}%</span>
+                      </div>
+                    ))}
+                    <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid #e5e7eb',display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:700,color:total===100?'#16a34a':total>100?'#dc2626':'#d97706'}}>
+                      <span>Total acumulado:</span>
+                      <span>{total.toFixed(1)}% {total===100?'✓':total>100?'⚠️ Pasa de 100':`(falta ${(100-total).toFixed(1)}%)`}</span>
+                    </div>
+                  </div>}
+                </div>
+              )
+            })()}
+          </>}
+        </div>
         <div style={S.fg}><label style={S.lbl}>Valor de compra ($) — para ROI</label><input style={S.inp} type="number" value={d.valor_compra||''} onChange={e=>up('valor_compra',parseFloat(e.target.value)||0)}/></div>
         {owners&&owners.length>0&&<div style={S.fg}>
           <label style={S.lbl}>Propietarios y porcentajes</label>
@@ -1128,7 +1166,7 @@ export default function Dashboard(){
       />}
 
       {modal?.type==='prop'&&<FormProp
-        ini={modal.data} grupos={grupos} owners={owners}
+        ini={modal.data} grupos={grupos} owners={owners} propsList={props}
         onSave={async(d:any)=>{if(modal.data)await store.updProp(modal.data.id,d);else await store.addProp(d)}}
         onDelete={async()=>{if(modal.data)await store.delProp(modal.data.id)}}
         onClose={()=>setModal(null)}
