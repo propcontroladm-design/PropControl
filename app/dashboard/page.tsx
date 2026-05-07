@@ -132,10 +132,24 @@ function useAppData(workspaceId:string, userId:string){
     return{count:data?.length||0,error}
   }
 
+  // Grupos extra
+  async function updGrupo(id:string,d:any){await sb.from('grupos').update(d).eq('id',id);setGrupos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+
+  // Expensas
+  async function addExpensa(d:any){const{data}=await sb.from('expensas').insert({...d,...ws}).select().single();if(data)setExpensas(p=>[...p,data]);return data}
+  async function updExpensa(id:string,d:any){await sb.from('expensas').update(d).eq('id',id);setExpensas(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function delExpensa(id:string){await sb.from('expensas').delete().eq('id',id);setExpensas(p=>p.filter(x=>x.id!==id))}
+
+  // Indices
+  async function addIndice(d:any){const{data}=await sb.from('indices').insert({...d,...ws}).select().single();if(data)setIndices(p=>[...p,data]);return data}
+  async function updIndice(id:string,d:any){await sb.from('indices').update(d).eq('id',id);setIndices(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function delIndice(id:string){await sb.from('indices').delete().eq('id',id);setIndices(p=>p.filter(x=>x.id!==id))}
+
   return{props,inqs,contratos,pagos,vars,gastos,grupos,owners,indices,expensas,loading,
     addProp,updProp,delProp,addInq,updInq,delInq,addContrato,updContrato,delContrato,
-    addPago,delPago,setVar,addGasto,delGasto,addGrupo,delGrupo,addOwner,updOwner,delOwner,
-    bulkImport,reload:loadAll}
+    addPago,delPago,setVar,addGasto,delGasto,addGrupo,updGrupo,delGrupo,
+    addOwner,updOwner,delOwner,addExpensa,updExpensa,delExpensa,
+    addIndice,updIndice,delIndice,bulkImport,reload:loadAll}
 }
 
 // ─── STYLES ───────────────────────────────────
@@ -227,7 +241,7 @@ function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel}:an
 
 // ─── FORM PROPIEDAD ───────────────────────────
 function FormProp({ini,grupos,owners,onSave,onDelete,onClose}:any){
-  const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0})
+  const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0,propietarios:[]})
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const ok=d.nombre.trim()
   return(
@@ -257,6 +271,25 @@ function FormProp({ini,grupos,owners,onSave,onDelete,onClose}:any){
         </div>}
         {d.grupo_id&&<div style={S.fg}><label style={S.lbl}>% Expensas del edificio</label><input style={S.inp} type="number" value={d.pct_expensas||''} onChange={e=>up('pct_expensas',parseFloat(e.target.value)||0)}/></div>}
         <div style={S.fg}><label style={S.lbl}>Valor de compra ($) — para ROI</label><input style={S.inp} type="number" value={d.valor_compra||''} onChange={e=>up('valor_compra',parseFloat(e.target.value)||0)}/></div>
+        {owners&&owners.length>0&&<div style={S.fg}>
+          <label style={S.lbl}>Propietarios y porcentajes</label>
+          <div style={{padding:'8px 10px',borderRadius:9,fontSize:11,marginBottom:7,background:'#dbeafe',color:'#1e3a8a'}}>Si esta propiedad tiene varios dueños, asigná el % de cada uno. La suma debería dar 100%.</div>
+          {owners.map((o:any)=>{
+            const asig=(d.propietarios||[]).find((p:any)=>p.owner_id===o.id)
+            return(
+              <div key={o.id} style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
+                <span style={{fontSize:13,flex:1}}>{o.nombre}</span>
+                <input style={{width:80,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:13,textAlign:'right'}} type="number" placeholder="0%" value={asig?.pct||''} onChange={e=>{
+                  const v=parseFloat(e.target.value)||0
+                  const list=(d.propietarios||[]).filter((p:any)=>p.owner_id!==o.id)
+                  if(v>0)list.push({owner_id:o.id,nombre:o.nombre,pct:v})
+                  up('propietarios',list)
+                }}/>
+                <span style={{fontSize:12,color:'#6b7280'}}>%</span>
+              </div>
+            )
+          })}
+        </div>}
         <div style={S.fg}><label style={S.lbl}>Observaciones</label><textarea style={{...S.inp,resize:'none'}} rows={2} value={d.observaciones} onChange={e=>up('observaciones',e.target.value)}/></div>
         <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
         {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar propiedad</button>}
@@ -582,6 +615,10 @@ export default function Dashboard(){
     {id:'props',ico:'🏢',lbl:'Propied.'},
     {id:'inqs',ico:'👤',lbl:'Inquilin.'},
     {id:'contratos',ico:'📄',lbl:'Contratos'},
+    {id:'grupos',ico:'🏘️',lbl:'Grupos'},
+    {id:'expensas',ico:'💸',lbl:'Expensas'},
+    {id:'owners',ico:'👔',lbl:'Dueños'},
+    {id:'indices',ico:'📏',lbl:'Índices'},
     {id:'vars',ico:'📈',lbl:'Variables'},
     {id:'gastos',ico:'🔧',lbl:'Gastos'},
     {id:'reporte',ico:'📊',lbl:'Reporte'},
@@ -918,6 +955,10 @@ export default function Dashboard(){
       case 'props':return renderProps()
       case 'inqs':return renderInqs()
       case 'contratos':return renderContratos()
+      case 'grupos':return <RenderGrupos store={store} setModal={setModal}/>
+      case 'expensas':return <RenderExpensas store={store} setModal={setModal}/>
+      case 'owners':return <RenderOwners store={store} setModal={setModal}/>
+      case 'indices':return <RenderIndices store={store} setModal={setModal}/>
       case 'vars':return renderVars()
       case 'gastos':return renderGastos()
       case 'reporte':return renderReporte()
@@ -932,6 +973,10 @@ export default function Dashboard(){
     props:()=>setModal({type:'prop',data:null}),
     inqs:()=>setModal({type:'inq',data:null}),
     contratos:()=>setModal({type:'contrato',data:null}),
+    grupos:()=>setModal({type:'grupo',data:null}),
+    expensas:()=>setModal({type:'expensa',data:null}),
+    owners:()=>setModal({type:'owner',data:null}),
+    indices:()=>setModal({type:'indice',data:null}),
     gastos:()=>setModal({type:'gasto'}),
   }
 
@@ -1020,6 +1065,34 @@ export default function Dashboard(){
           </div>
         </div>
       )}
+
+      {modal?.type==='grupo'&&<FormGrupo
+        ini={modal.data}
+        onSave={async(d:any)=>{if(modal.data)await store.updGrupo(modal.data.id,d);else await store.addGrupo(d)}}
+        onDelete={async()=>{if(modal.data)await store.delGrupo(modal.data.id)}}
+        onClose={()=>setModal(null)}
+      />}
+
+      {modal?.type==='owner'&&<FormOwner
+        ini={modal.data}
+        onSave={async(d:any)=>{if(modal.data)await store.updOwner(modal.data.id,d);else await store.addOwner(d)}}
+        onDelete={async()=>{if(modal.data)await store.delOwner(modal.data.id)}}
+        onClose={()=>setModal(null)}
+      />}
+
+      {modal?.type==='expensa'&&<FormExpensa
+        ini={modal.data} grupos={grupos} props={props}
+        onSave={async(d:any)=>{if(modal.data)await store.updExpensa(modal.data.id,d);else await store.addExpensa(d)}}
+        onDelete={async()=>{if(modal.data)await store.delExpensa(modal.data.id)}}
+        onClose={()=>setModal(null)}
+      />}
+
+      {modal?.type==='indice'&&<FormIndice
+        ini={modal.data}
+        onSave={async(d:any)=>{if(modal.data)await store.updIndice(modal.data.id,d);else await store.addIndice(d)}}
+        onDelete={async()=>{if(modal.data)await store.delIndice(modal.data.id)}}
+        onClose={()=>setModal(null)}
+      />}
     </div>
   )
 }
@@ -1268,6 +1341,330 @@ function RenderImportar({store}:any){
       <button style={S.btnP} onClick={()=>fileRef.current?.click()}>📁 Seleccionar archivo</button>
       {msg&&<div style={{padding:'10px 12px',borderRadius:9,fontSize:13,marginTop:9,background:msg.startsWith('Error')?'#fee2e2':msg.startsWith('✓')?'#dcfce7':'#dbeafe',color:msg.startsWith('Error')?'#7f1d1d':msg.startsWith('✓')?'#14532d':'#1e3a8a'}}>{msg}</div>}
       <div style={{height:70}}/>
+    </div>
+  )
+}
+
+
+// ─── TAB GRUPOS ───────────────────────────────
+function RenderGrupos({store,setModal}:any){
+  const {grupos,props}=store
+  return(
+    <div style={{padding:14}}>
+      <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+        💡 Los grupos te permiten agrupar propiedades por edificio, complejo, o cualquier criterio. Útil para distribuir expensas.
+      </div>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{grupos.length} grupos</p>
+      {grupos.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}>
+        <div style={{fontSize:40,marginBottom:8}}>🏘️</div>
+        <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin grupos</div>
+        <div style={{fontSize:13}}>Tocá + para crear uno (ej: Edificio Belgrano)</div>
+      </div>}
+      {grupos.map((g:any)=>{
+        const propsDelGrupo=props.filter((p:any)=>p.grupo_id===g.id)
+        const totalPct=propsDelGrupo.reduce((s:number,p:any)=>s+(p.pct_expensas||0),0)
+        return(
+          <div key={g.id} style={S.card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15}}>{g.nombre}</div>
+                {g.direccion&&<div style={{fontSize:12,color:'#6b7280'}}>{g.direccion}</div>}
+                <div style={{fontSize:12,color:'#16a34a',fontWeight:600,marginTop:3}}>
+                  {propsDelGrupo.length} propiedad{propsDelGrupo.length!==1?'es':''} · Suma %: {totalPct}%
+                </div>
+              </div>
+              <button onClick={()=>setModal({type:'grupo',data:g})} style={{background:'#f3f4f6',color:'#111827',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Editar</button>
+            </div>
+            {propsDelGrupo.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
+              {propsDelGrupo.map((p:any)=>(
+                <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                  <span>• {p.codigo} · {p.nombre}</span>
+                  <span style={{fontWeight:600,color:'#6b7280'}}>{p.pct_expensas||0}%</span>
+                </div>
+              ))}
+            </div>}
+            {totalPct!==100&&propsDelGrupo.length>0&&<div style={{padding:'6px 9px',borderRadius:7,fontSize:11,marginTop:6,background:'#fef3c7',color:'#78350f'}}>
+              ⚠️ La suma de % no llega a 100. Revisá los porcentajes en cada propiedad.
+            </div>}
+          </div>
+        )
+      })}
+      <div style={{height:70}}/>
+    </div>
+  )
+}
+
+function FormGrupo({ini,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{nombre:'',direccion:'',descripcion:''})
+  const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+  const ok=d.nombre.trim()
+  return(
+    <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={S.modalBox}>
+        <div style={S.handle}/>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar grupo':'Nuevo grupo'}</div>
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: Edificio Belgrano" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>Dirección</label><input style={S.inp} value={d.direccion||''} onChange={e=>up('direccion',e.target.value)}/></div>
+        <div style={S.fg}><label style={S.lbl}>Descripción / Notas</label><textarea style={{...S.inp,resize:'none'}} rows={2} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)}/></div>
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
+        {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar</button>}
+        <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── TAB EXPENSAS ─────────────────────────────
+function RenderExpensas({store,setModal}:any){
+  const {expensas,grupos,props}=store
+  return(
+    <div style={{padding:14}}>
+      <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+        💡 Cargá un gasto del edificio (ej: $200.000 de mantenimiento) y se distribuye automáticamente entre las propiedades del grupo según su %.
+      </div>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{expensas.length} expensas</p>
+      {expensas.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}>
+        <div style={{fontSize:40,marginBottom:8}}>💸</div>
+        <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin expensas cargadas</div>
+        <div style={{fontSize:13}}>Tocá + para registrar la primera</div>
+      </div>}
+      {expensas.map((e:any)=>{
+        const grupo=grupos.find((g:any)=>g.id===e.grupo_id)
+        const propsDelGrupo=props.filter((p:any)=>p.grupo_id===e.grupo_id)
+        return(
+          <div key={e.id} style={S.card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:14}}>{e.concepto||'Expensa'}</div>
+                <div style={{fontSize:12,color:'#6b7280',marginTop:2}}>{grupo?.nombre||'Sin grupo'} · {e.periodo||''}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:16,fontWeight:800}}>{fmtN(e.monto,'pesos')}</div>
+                <button onClick={()=>setModal({type:'expensa',data:e})} style={{background:'#f3f4f6',color:'#111827',padding:'4px 10px',borderRadius:7,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',marginTop:4}}>Editar</button>
+              </div>
+            </div>
+            {propsDelGrupo.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'#6b7280',marginBottom:4}}>Distribución:</div>
+              {propsDelGrupo.map((p:any)=>{
+                const pct=p.pct_expensas||0
+                const monto=e.monto*pct/100
+                return(
+                  <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                    <span>{p.codigo} ({pct}%)</span>
+                    <span style={{fontWeight:600}}>{fmtN(monto,'pesos')}</span>
+                  </div>
+                )
+              })}
+            </div>}
+          </div>
+        )
+      })}
+      <div style={{height:70}}/>
+    </div>
+  )
+}
+
+function FormExpensa({ini,grupos,props,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{concepto:'',monto:'',grupo_id:'',periodo:new Date().toISOString().slice(0,7),estado:'pendiente',descripcion:''})
+  const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+  const ok=d.concepto&&d.monto&&d.grupo_id
+  const propsDelGrupo=props.filter((p:any)=>p.grupo_id===d.grupo_id)
+  const monto=parseFloat(d.monto)||0
+  return(
+    <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={S.modalBox}>
+        <div style={S.handle}/>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar expensa':'Nueva expensa'}</div>
+        <div style={S.fg}><label style={S.lbl}>Concepto</label><input style={S.inp} value={d.concepto} onChange={e=>up('concepto',e.target.value)} placeholder="Ej: Limpieza, Ascensor, ABL" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>Grupo / Edificio</label>
+          <select style={S.sel} value={d.grupo_id} onChange={e=>up('grupo_id',e.target.value)}>
+            <option value="">— Seleccionar —</option>
+            {grupos.map((g:any)=><option key={g.id} value={g.id}>{g.nombre}</option>)}
+          </select>
+        </div>
+        <div style={S.fg}><label style={S.lbl}>Monto total ($)</label><input style={S.inp} type="number" value={d.monto} onChange={e=>up('monto',e.target.value)}/></div>
+        <div style={S.fg}><label style={S.lbl}>Período (AAAA-MM)</label><input style={S.inp} type="month" value={d.periodo} onChange={e=>up('periodo',e.target.value)}/></div>
+        {d.grupo_id&&propsDelGrupo.length>0&&monto>0&&<div style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:9}}>
+          <div style={{fontSize:11,fontWeight:700,color:'#6b7280',marginBottom:5}}>Distribución automática:</div>
+          {propsDelGrupo.map((p:any)=>{
+            const pct=p.pct_expensas||0
+            const m=monto*pct/100
+            return(
+              <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                <span>{p.codigo} ({pct}%)</span>
+                <span style={{fontWeight:600}}>{fmtN(m,'pesos')}</span>
+              </div>
+            )
+          })}
+        </div>}
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave({...d,monto:parseFloat(d.monto)||0});onClose()}}}>Guardar</button>
+        {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar</button>}
+        <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── TAB DUEÑOS / PROPIETARIOS ────────────────
+function RenderOwners({store,setModal}:any){
+  const {owners,props}=store
+  return(
+    <div style={{padding:14}}>
+      <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+        💡 Cargá los dueños/propietarios de las propiedades. Después en cada propiedad asignás el % de cada uno (puede haber varios).
+      </div>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{owners.length} propietarios</p>
+      {owners.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}>
+        <div style={{fontSize:40,marginBottom:8}}>👔</div>
+        <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin propietarios</div>
+        <div style={{fontSize:13}}>Tocá + para agregar uno</div>
+      </div>}
+      {owners.map((o:any)=>{
+        const propsDelOwner=props.filter((p:any)=>(p.propietarios||[]).some((x:any)=>x.owner_id===o.id))
+        return(
+          <div key={o.id} style={S.card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15}}>{o.nombre}</div>
+                {o.email&&<div style={{fontSize:12,color:'#6b7280'}}>📧 {o.email}</div>}
+                {o.telefono&&<div style={{fontSize:12,color:'#6b7280'}}>📱 {o.telefono}</div>}
+                {o.cuit&&<div style={{fontSize:12,color:'#6b7280'}}>CUIT: {o.cuit}</div>}
+                <div style={{fontSize:12,color:'#16a34a',fontWeight:600,marginTop:3}}>{propsDelOwner.length} propiedad{propsDelOwner.length!==1?'es':''}</div>
+              </div>
+              <button onClick={()=>setModal({type:'owner',data:o})} style={{background:'#f3f4f6',color:'#111827',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Editar</button>
+            </div>
+            {propsDelOwner.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
+              {propsDelOwner.map((p:any)=>{
+                const asig=(p.propietarios||[]).find((x:any)=>x.owner_id===o.id)
+                return(
+                  <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                    <span>• {p.codigo} {p.nombre}</span>
+                    <span style={{fontWeight:600,color:'#6b7280'}}>{asig?.pct||0}%</span>
+                  </div>
+                )
+              })}
+            </div>}
+          </div>
+        )
+      })}
+      <div style={{height:70}}/>
+    </div>
+  )
+}
+
+function FormOwner({ini,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{nombre:'',cuit:'',dni:'',telefono:'',email:'',direccion:'',observaciones:''})
+  const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+  const ok=d.nombre.trim()
+  return(
+    <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={S.modalBox}>
+        <div style={S.handle}/>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar propietario':'Nuevo propietario'}</div>
+        <div style={S.fg}><label style={S.lbl}>Nombre completo</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} autoFocus/></div>
+        <div style={{display:'flex',gap:9,marginBottom:11}}>
+          <div style={{flex:1}}><label style={S.lbl}>CUIT</label><input style={S.inp} value={d.cuit||''} onChange={e=>up('cuit',e.target.value)}/></div>
+          <div style={{flex:1}}><label style={S.lbl}>DNI</label><input style={S.inp} value={d.dni||''} onChange={e=>up('dni',e.target.value)}/></div>
+        </div>
+        <div style={S.fg}><label style={S.lbl}>Teléfono</label><input style={S.inp} type="tel" value={d.telefono||''} onChange={e=>up('telefono',e.target.value)}/></div>
+        <div style={S.fg}><label style={S.lbl}>Email</label><input style={S.inp} type="email" value={d.email||''} onChange={e=>up('email',e.target.value)}/></div>
+        <div style={S.fg}><label style={S.lbl}>Dirección</label><input style={S.inp} value={d.direccion||''} onChange={e=>up('direccion',e.target.value)}/></div>
+        <div style={S.fg}><label style={S.lbl}>Observaciones</label><textarea style={{...S.inp,resize:'none'}} rows={2} value={d.observaciones||''} onChange={e=>up('observaciones',e.target.value)}/></div>
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
+        {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar</button>}
+        <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── TAB ÍNDICES ──────────────────────────────
+function RenderIndices({store,setModal}:any){
+  const {indices}=store
+  return(
+    <div style={{padding:14}}>
+      <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+        💡 Creá índices personalizados (ej: ICL, IPC propio, índice del consorcio) y cargá el % de variación de cada mes. Después usalos en los contratos.
+      </div>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{indices.length} índices</p>
+      {indices.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}>
+        <div style={{fontSize:40,marginBottom:8}}>📏</div>
+        <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin índices</div>
+        <div style={{fontSize:13}}>Tocá + para crear uno (ej: ICL, IPC Tucumán)</div>
+      </div>}
+      {indices.map((i:any)=>{
+        const valores=i.valores||{}
+        const meses=Object.keys(valores).sort().reverse().slice(0,6)
+        return(
+          <div key={i.id} style={S.card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15}}>{i.nombre}</div>
+                {i.descripcion&&<div style={{fontSize:12,color:'#6b7280'}}>{i.descripcion}</div>}
+              </div>
+              <button onClick={()=>setModal({type:'indice',data:i})} style={{background:'#f3f4f6',color:'#111827',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Editar valores</button>
+            </div>
+            {meses.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'#6b7280',marginBottom:4}}>Últimos meses:</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {meses.map((m:string)=>(
+                  <span key={m} style={{fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:6,background:'#f3f4f6',color:'#111827'}}>{m}: {valores[m]}%</span>
+                ))}
+              </div>
+            </div>}
+          </div>
+        )
+      })}
+      <div style={{height:70}}/>
+    </div>
+  )
+}
+
+function FormIndice({ini,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{nombre:'',descripcion:'',valores:{}})
+  const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+  const upVal=(mes:string,v:number)=>setD((p:any)=>({...p,valores:{...(p.valores||{}),[mes]:v}}))
+  const delVal=(mes:string)=>setD((p:any)=>{const n={...(p.valores||{})};delete n[mes];return{...p,valores:n}})
+  const [nMes,setNMes]=useState(new Date().toISOString().slice(0,7))
+  const [nVal,setNVal]=useState('')
+
+  function addVal(){
+    if(!nMes||!nVal)return
+    upVal(nMes,parseFloat(nVal)||0)
+    setNVal('')
+  }
+
+  const ok=d.nombre.trim()
+  const meses=Object.keys(d.valores||{}).sort().reverse()
+
+  return(
+    <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={S.modalBox}>
+        <div style={S.handle}/>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar índice':'Nuevo índice'}</div>
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: ICL, IPC Tucumán" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>Descripción</label><input style={S.inp} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)}/></div>
+        <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Variación mensual (%)</p>
+        <div style={{display:'flex',gap:6,marginBottom:9}}>
+          <input style={{...S.inp,flex:1}} type="month" value={nMes} onChange={e=>setNMes(e.target.value)}/>
+          <input style={{...S.inp,width:90}} type="number" placeholder="%" value={nVal} onChange={e=>setNVal(e.target.value)}/>
+          <button onClick={addVal} style={{background:'#dbeafe',color:'#2563eb',padding:'0 12px',borderRadius:9,fontSize:13,fontWeight:700,border:'none',cursor:'pointer'}}>+</button>
+        </div>
+        {meses.length>0?<div style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:9,maxHeight:200,overflowY:'auto'}}>
+          {meses.map((m:string)=>(
+            <div key={m} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:'1px solid #e5e7eb'}}>
+              <span style={{fontSize:13,fontWeight:600}}>{m}</span>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:13,fontWeight:700}}>{d.valores[m]}%</span>
+                <button onClick={()=>delVal(m)} style={{background:'none',border:'none',color:'#dc2626',fontSize:16,cursor:'pointer',padding:'2px 6px'}}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>:<div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#fef3c7',color:'#78350f'}}>Todavía no cargaste valores. Agregá al menos uno.</div>}
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar índice</button>
+        {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar</button>}
+        <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
+      </div>
     </div>
   )
 }
