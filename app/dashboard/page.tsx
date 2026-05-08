@@ -24,6 +24,11 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   const ini=new Date((alq.fecha_inicio||'2025-01-01')+'T00:00:00')
   const mr=(y-ini.getFullYear())*12+(m-ini.getMonth())+1
   function debeAj(fr:string){if(!fr||fr==='mensual')return true;if(fr==='trimestral')return (mr-1)%3===0;if(fr==='semestral')return (mr-1)%6===0;if(fr==='anual')return (mr-1)%12===0;return true}
+  function calcEscalonado(tramos:any[]){
+    if(!tramos||tramos.length===0)return null
+    const t=tramos.find((tr:any)=>mr>=tr.mesDesde&&mr<=tr.mesHasta)
+    return t||null
+  }
   function cb(base:number,mon:string,aj:string,iid:string,fr:string,iva:boolean){
     let v=parseFloat(String(base))||0
     if(debeAj(fr)){
@@ -32,13 +37,20 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
     }
     return{monto:v*(iva?1.21:1),moneda:mon||'pesos',iva:!!iva}
   }
-  // NEW: multi-conceptos
+  // NEW: multi-conceptos (puede ser fijo o escalonado por concepto)
   if(c.conceptos && c.conceptos.length>0){
     const items=c.conceptos.map((cp:any)=>{
+      // Si el concepto es escalonado y tiene tramos
+      if(cp.tipo==='escalonado'&&cp.tramos&&cp.tramos.length>0){
+        const t=calcEscalonado(cp.tramos)
+        if(!t)return{monto:0,moneda:cp.moneda||'pesos',iva:!!cp.iva,nombre:cp.nombre,fueraDeRango:true}
+        const r=cb(t.montoBase,t.moneda||cp.moneda,t.ajuste||'ninguno',t.indiceId,t.frecAjuste||'mensual',cp.iva)
+        return{...r,nombre:cp.nombre||'Concepto'}
+      }
+      // Concepto fijo
       const r=cb(cp.monto,cp.moneda,cp.ajuste,cp.indice_id,cp.frec_ajuste,cp.iva)
       return{...r,nombre:cp.nombre||'Concepto'}
     })
-    // Convert all to pesos and sum
     const totP=items.reduce((s:number,it:any)=>{
       if(it.moneda==='pesos')return s+it.monto
       if(it.moneda==='dolar')return s+it.monto*((vm&&vm.dolar)||0)
@@ -46,10 +58,9 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
     },0)
     return{monto:totP,moneda:'pesos',iva:false,items,multi:true}
   }
-  // Single concept (legacy)
   const iva=c.iva?true:false
   if(c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
-  if(c.tipo==='escalonado'){const tr=c.tramos||[];const t=tr.find((t:any)=>mr>=t.mesDesde&&mr<=t.mesHasta);if(!t)return null;return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
+  if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return null;return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
   return null
 }
 
@@ -371,47 +382,96 @@ function FormInq({ini,onSave,onDelete,onClose}:any){
 
 // ─── FORM CONTRATO ────────────────────────────
 function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
-  // Detect mode: if has conceptos use new mode, else old mode
   const hasConceptos = ini?.contrato?.conceptos?.length > 0
   const [modo,setModo]=useState<'simple'|'multi'>(hasConceptos?'multi':(ini?'simple':'simple'))
   const [d,setD]=useState(ini||{
-    propiedad_id:'',inquilino_id:'',fecha_inicio:new Date().toISOString().slice(0,10),activo:true,
-    tipo:'fijo',moneda:'pesos',monto_base:'',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,
+    propiedad_id:'',propiedades_ids:[],inquilino_id:'',
+    fecha_inicio:new Date().toISOString().slice(0,10),fecha_fin:'',
+    activo:true,tipo:'fijo',moneda:'pesos',monto_base:'',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,
     tramos:[{id:uid(),mesDesde:1,mesHasta:6,montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}],
     conceptos:[]
   })
-  // If multi mode and no conceptos, init with default
+
+  // Inicializar propiedades_ids desde propiedad_id si viene legacy
+  useEffect(()=>{
+    if(ini && (!d.propiedades_ids || d.propiedades_ids.length===0) && d.propiedad_id){
+      setD((p:any)=>({...p,propiedades_ids:[d.propiedad_id]}))
+    }
+  },[])
+
   useEffect(()=>{
     if(modo==='multi'&&(!d.conceptos||d.conceptos.length===0)){
       setD((p:any)=>({...p,conceptos:[
-        {id:uid(),nombre:'Alquiler',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false}
+        {id:uid(),nombre:'Alquiler',tipo:'fijo',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,tramos:[]}
       ]}))
     }
   },[modo])
 
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+
+  // Tramos del modo simple escalonado
   const upT=(tid:string,f:string,v:any)=>setD((p:any)=>({...p,tramos:p.tramos.map((t:any)=>t.id===tid?{...t,[f]:v}:t)}))
   const addT=()=>setD((p:any)=>{const last=p.tramos[p.tramos.length-1];const desde=last?last.mesHasta+1:1;return{...p,tramos:[...p.tramos,{id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:p.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}})
   const delT=(tid:string)=>setD((p:any)=>({...p,tramos:p.tramos.filter((t:any)=>t.id!==tid)}))
 
-  // Conceptos handlers
+  // Conceptos
   const upC=(cid:string,f:string,v:any)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>cp.id===cid?{...cp,[f]:v}:cp)}))
-  const addC=()=>setD((p:any)=>({...p,conceptos:[...(p.conceptos||[]),{id:uid(),nombre:'',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false}]}))
+  const addC=()=>setD((p:any)=>({...p,conceptos:[...(p.conceptos||[]),{id:uid(),nombre:'',tipo:'fijo',monto:'',moneda:'pesos',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,tramos:[]}]}))
   const delC=(cid:string)=>setD((p:any)=>({...p,conceptos:p.conceptos.filter((cp:any)=>cp.id!==cid)}))
 
-  const ok=d.propiedad_id&&d.inquilino_id&&d.fecha_inicio&&(
-    modo==='multi' ? (d.conceptos?.length>0 && d.conceptos.every((cp:any)=>cp.nombre&&cp.monto)) :
+  // Tramos dentro de conceptos
+  const addCT=(cid:string)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>{
+    if(cp.id!==cid)return cp
+    const tramos=cp.tramos||[]
+    const last=tramos[tramos.length-1]
+    const desde=last?last.mesHasta+1:1
+    return{...cp,tramos:[...tramos,{id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:cp.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}
+  })}))
+  const upCT=(cid:string,tid:string,f:string,v:any)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>{
+    if(cp.id!==cid)return cp
+    return{...cp,tramos:(cp.tramos||[]).map((t:any)=>t.id===tid?{...t,[f]:v}:t)}
+  })}))
+  const delCT=(cid:string,tid:string)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>{
+    if(cp.id!==cid)return cp
+    return{...cp,tramos:(cp.tramos||[]).filter((t:any)=>t.id!==tid)}
+  })}))
+
+  // Multi-propiedad toggle
+  const toggleProp=(propId:string)=>setD((p:any)=>{
+    const list=p.propiedades_ids||[]
+    if(list.includes(propId))return{...p,propiedades_ids:list.filter((id:string)=>id!==propId)}
+    return{...p,propiedades_ids:[...list,propId]}
+  })
+
+  const propsActivas=props.filter((p:any)=>p.activo)
+  const propsSeleccionadas=(d.propiedades_ids||[])
+  
+  const ok=propsSeleccionadas.length>0&&d.inquilino_id&&d.fecha_inicio&&(
+    modo==='multi' ? (d.conceptos?.length>0 && d.conceptos.every((cp:any)=>{
+      if(!cp.nombre)return false
+      if(cp.tipo==='escalonado')return cp.tramos&&cp.tramos.length>0&&cp.tramos.every((t:any)=>t.montoBase)
+      return cp.monto
+    })) :
     (d.tipo==='fijo'?d.monto_base:d.tramos.every((t:any)=>t.montoBase))
   )
-  const prop=props.find((p:any)=>p.id===d.propiedad_id)
+
   const inq=inqs.find((i:any)=>i.id===d.inquilino_id)
+  const propsObjs=propsActivas.filter((p:any)=>propsSeleccionadas.includes(p.id))
+  const nombrePropConcat=propsObjs.map((p:any)=>p.codigo||p.nombre).join(' + ')
 
   const handleSave=()=>{
     if(!ok)return
-    let data:any={...d,nombre_propiedad:prop?(prop.nombre||prop.codigo):'',nombre_inquilino:inq?inq.nombre:''}
+    let data:any={...d,nombre_propiedad:nombrePropConcat||'',nombre_inquilino:inq?inq.nombre:''}
+    // Mantener propiedad_id por compatibilidad (la primera)
+    data.propiedad_id=propsSeleccionadas[0]
+    
     if(modo==='multi'){
-      data.conceptos=data.conceptos.map((cp:any)=>({...cp,monto:parseFloat(cp.monto)||0}))
-      // Clear old fields
+      data.conceptos=data.conceptos.map((cp:any)=>{
+        if(cp.tipo==='escalonado'){
+          return{...cp,monto:0,tramos:(cp.tramos||[]).map((t:any)=>({...t,montoBase:parseFloat(t.montoBase)||0}))}
+        }
+        return{...cp,monto:parseFloat(cp.monto)||0,tramos:[]}
+      })
       data.tipo='multi'
       data.monto_base=0
       data.tramos=[]
@@ -431,26 +491,49 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
       <div style={S.modalBox}>
         <div style={S.handle}/>
         <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar contrato':'Nuevo contrato'}</div>
-        <div style={S.fg}><label style={S.lbl}>Propiedad</label>
-          <select style={S.sel} value={d.propiedad_id} onChange={e=>up('propiedad_id',e.target.value)}>
-            <option value="">— Seleccionar —</option>
-            {props.filter((p:any)=>p.activo).map((p:any)=><option key={p.id} value={p.id}>{p.codigo} · {p.nombre}</option>)}
-          </select>
+
+        {/* PROPIEDADES (multi) */}
+        <div style={{...S.fg,background:'#f8fafc',padding:12,borderRadius:11,border:'1px solid #e5e7eb'}}>
+          <label style={{...S.lbl,marginBottom:6}}>🏢 Propiedades del contrato</label>
+          <div style={{padding:'8px 10px',borderRadius:8,fontSize:11,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
+            Marcá una o varias propiedades (ej: dos locales que se alquilan juntos)
+          </div>
+          {propsActivas.length===0?<div style={{padding:10,fontSize:12,color:'#78350f',background:'#fef3c7',borderRadius:8}}>No hay propiedades activas. Creá una primero.</div>:
+          <div style={{maxHeight:180,overflowY:'auto',background:'white',border:'1px solid #e5e7eb',borderRadius:9,padding:6}}>
+            {propsActivas.map((p:any)=>{
+              const sel=propsSeleccionadas.includes(p.id)
+              return(
+                <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'7px 9px',borderRadius:7,cursor:'pointer',background:sel?'#dbeafe':'transparent',marginBottom:2}}>
+                  <input type="checkbox" checked={sel} onChange={()=>toggleProp(p.id)} style={{width:16,height:16,accentColor:'#2563eb'}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{p.codigo} · {p.nombre}</div>
+                    {p.direccion&&<div style={{fontSize:11,color:'#64748b'}}>{p.direccion}</div>}
+                  </div>
+                </label>
+              )
+            })}
+          </div>}
+          {propsSeleccionadas.length>1&&<div style={{marginTop:7,padding:'6px 9px',background:'#dcfce7',color:'#14532d',borderRadius:7,fontSize:11,fontWeight:600}}>✓ {propsSeleccionadas.length} propiedades seleccionadas</div>}
         </div>
-        <div style={S.fg}><label style={S.lbl}>Inquilino</label>
+
+        <div style={S.fg}><label style={S.lbl}>👤 Inquilino</label>
           <select style={S.sel} value={d.inquilino_id} onChange={e=>up('inquilino_id',e.target.value)}>
             <option value="">— Seleccionar —</option>
             {inqs.map((i:any)=><option key={i.id} value={i.id}>{i.nombre}{i.es_sociedad?' 🏢':''}</option>)}
           </select>
         </div>
-        <div style={S.fg}><label style={S.lbl}>Inicio</label><input style={S.inp} type="date" value={d.fecha_inicio} onChange={e=>up('fecha_inicio',e.target.value)}/></div>
+
+        <div style={{display:'flex',gap:9,marginBottom:11}}>
+          <div style={{flex:1}}><label style={S.lbl}>📅 Inicio</label><input style={S.inp} type="date" value={d.fecha_inicio} onChange={e=>up('fecha_inicio',e.target.value)}/></div>
+          <div style={{flex:1}}><label style={S.lbl}>📅 Vencimiento</label><input style={S.inp} type="date" value={d.fecha_fin||''} onChange={e=>up('fecha_fin',e.target.value)}/></div>
+        </div>
 
         <div style={S.fg}><label style={S.lbl}>Modo de contrato</label>
           <div style={{display:'flex',gap:6}}>
-            <button onClick={()=>setModo('simple')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='simple'?'#2563eb':'#e5e7eb'}`,background:modo==='simple'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='simple'?'#2563eb':'#6b7280',cursor:'pointer'}}>
-              Simple<div style={{fontSize:10,fontWeight:500,marginTop:2}}>1 monto</div>
+            <button type="button" onClick={()=>setModo('simple')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='simple'?'#2563eb':'#e5e7eb'}`,background:modo==='simple'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='simple'?'#2563eb':'#6b7280',cursor:'pointer'}}>
+              Simple<div style={{fontSize:10,fontWeight:500,marginTop:2}}>1 monto único</div>
             </button>
-            <button onClick={()=>setModo('multi')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='multi'?'#2563eb':'#e5e7eb'}`,background:modo==='multi'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='multi'?'#2563eb':'#6b7280',cursor:'pointer'}}>
+            <button type="button" onClick={()=>setModo('multi')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${modo==='multi'?'#2563eb':'#e5e7eb'}`,background:modo==='multi'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:modo==='multi'?'#2563eb':'#6b7280',cursor:'pointer'}}>
               Conceptos<div style={{fontSize:10,fontWeight:500,marginTop:2}}>varios items</div>
             </button>
           </div>
@@ -458,42 +541,88 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
 
         {modo==='multi'&&<div>
           <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
-            💡 Útil cuando una propiedad tiene varios conceptos (ej: alquiler sin IVA + cochera con IVA + expensas).
+            💡 Cada concepto puede ser fijo o escalonado por separado. Ej: alquiler escalonado + cochera fija con IVA.
           </div>
           {(d.conceptos||[]).map((cp:any,i:number)=>(
-            <div key={cp.id} style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:6,border:'1px solid #e5e7eb'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                <span style={{fontWeight:700,fontSize:13}}>Concepto {i+1}</span>
-                {d.conceptos.length>1&&<button style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delC(cp.id)}>✕</button>}
+            <div key={cp.id} style={{background:'#f8fafc',borderRadius:11,padding:12,marginBottom:8,border:'1.5px solid #e5e7eb'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
+                <span style={{fontWeight:700,fontSize:13,color:'#1e3a8a'}}>📌 Concepto {i+1}</span>
+                {d.conceptos.length>1&&<button type="button" style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delC(cp.id)}>✕</button>}
               </div>
               <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={cp.nombre} onChange={e=>upC(cp.id,'nombre',e.target.value)} placeholder="Ej: Alquiler / Cochera / Expensas"/></div>
-              <div style={S.fg}><label style={S.lbl}>Monto</label>
-                <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
-                  <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={cp.moneda} onChange={e=>upC(cp.id,'moneda',e.target.value)}>
-                    <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
-                  </select>
-                  <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={cp.monto} onChange={e=>upC(cp.id,'monto',e.target.value)}/>
+
+              <div style={S.fg}><label style={S.lbl}>Tipo</label>
+                <div style={{display:'flex',gap:5}}>
+                  <button type="button" onClick={()=>upC(cp.id,'tipo','fijo')} style={{flex:1,padding:7,borderRadius:7,border:`1.5px solid ${cp.tipo!=='escalonado'?'#2563eb':'#e5e7eb'}`,background:cp.tipo!=='escalonado'?'#dbeafe':'white',fontSize:12,fontWeight:700,color:cp.tipo!=='escalonado'?'#2563eb':'#64748b',cursor:'pointer'}}>Monto fijo</button>
+                  <button type="button" onClick={()=>upC(cp.id,'tipo','escalonado')} style={{flex:1,padding:7,borderRadius:7,border:`1.5px solid ${cp.tipo==='escalonado'?'#2563eb':'#e5e7eb'}`,background:cp.tipo==='escalonado'?'#dbeafe':'white',fontSize:12,fontWeight:700,color:cp.tipo==='escalonado'?'#2563eb':'#64748b',cursor:'pointer'}}>Escalonado</button>
                 </div>
               </div>
-              <div style={{display:'flex',gap:9,marginBottom:9}}>
-                <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
-                  <select style={S.sel} value={cp.ajuste||'ninguno'} onChange={e=>upC(cp.id,'ajuste',e.target.value)}>
-                    {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
-                  </select>
+
+              {cp.tipo!=='escalonado'?<>
+                <div style={S.fg}><label style={S.lbl}>Monto</label>
+                  <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
+                    <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={cp.moneda} onChange={e=>upC(cp.id,'moneda',e.target.value)}>
+                      <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
+                    </select>
+                    <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={cp.monto} onChange={e=>upC(cp.id,'monto',e.target.value)}/>
+                  </div>
                 </div>
-                <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
-                  <select style={S.sel} value={cp.frec_ajuste||'mensual'} onChange={e=>upC(cp.id,'frec_ajuste',e.target.value)}>
-                    {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
-                  </select>
+                <div style={{display:'flex',gap:9,marginBottom:9}}>
+                  <div style={{flex:1}}><label style={S.lbl}>Ajuste</label>
+                    <select style={S.sel} value={cp.ajuste||'ninguno'} onChange={e=>upC(cp.id,'ajuste',e.target.value)}>
+                      {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'Sin ajuste':a.toUpperCase()}</option>)}
+                    </select>
+                  </div>
+                  <div style={{flex:1}}><label style={S.lbl}>Frecuencia</label>
+                    <select style={S.sel} value={cp.frec_ajuste||'mensual'} onChange={e=>upC(cp.id,'frec_ajuste',e.target.value)}>
+                      {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:13}}>
+              </>:<>
+                <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'10px 0 7px'}}>Tramos</p>
+                {(cp.tramos||[]).map((t:any,j:number)=>(
+                  <div key={t.id} style={{background:'white',borderRadius:8,padding:9,marginBottom:5,border:'1px solid #e5e7eb'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:7}}>
+                      <span style={{fontWeight:700,fontSize:12}}>Tramo {j+1}</span>
+                      {cp.tramos.length>1&&<button type="button" style={{background:'#fee2e2',color:'#7f1d1d',padding:'2px 6px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delCT(cp.id,t.id)}>✕</button>}
+                    </div>
+                    <div style={{display:'flex',gap:7,marginBottom:6}}>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upCT(cp.id,t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Hasta mes</label><input style={S.inp} type="number" min={1} value={t.mesHasta} onChange={e=>upCT(cp.id,t.id,'mesHasta',parseInt(e.target.value)||12)}/></div>
+                    </div>
+                    <div style={{...S.fg,marginBottom:6}}><label style={{...S.lbl,fontSize:10}}>Monto</label>
+                      <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:8,overflow:'hidden'}}>
+                        <select style={{border:'none',background:'#f3f4f6',padding:'7px 6px',fontSize:11,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:62,color:'#111827'}} value={t.moneda||'pesos'} onChange={e=>upCT(cp.id,t.id,'moneda',e.target.value)}>
+                          <option value="pesos">$</option><option value="dolar">U$D</option><option value="nafta">L</option>
+                        </select>
+                        <input style={{flex:1,border:'none',padding:'7px 9px',fontSize:13,outline:'none',background:'white',minWidth:0}} type="number" value={t.montoBase} onChange={e=>upCT(cp.id,t.id,'montoBase',e.target.value)}/>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:6}}>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Ajuste</label>
+                        <select style={S.sel} value={t.ajuste||'ninguno'} onChange={e=>upCT(cp.id,t.id,'ajuste',e.target.value)}>
+                          {AJ.map(a=><option key={a} value={a}>{a==='ninguno'?'-':a.toUpperCase()}</option>)}
+                        </select>
+                      </div>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Frec.</label>
+                        <select style={S.sel} value={t.frecAjuste||'mensual'} onChange={e=>upCT(cp.id,t.id,'frecAjuste',e.target.value)}>
+                          {FR.map(f=><option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1,4)}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" style={{background:'#dbeafe',color:'#2563eb',padding:'6px 10px',borderRadius:8,fontSize:11,fontWeight:700,width:'100%',cursor:'pointer',border:'none'}} onClick={()=>addCT(cp.id)}>+ Tramo</button>
+              </>}
+
+              <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0 4px',fontSize:13}}>
                 <input type="checkbox" id={`iva_${cp.id}`} checked={!!cp.iva} onChange={e=>upC(cp.id,'iva',e.target.checked)} style={{width:17,height:17,accentColor:'#2563eb'}}/>
-                <label htmlFor={`iva_${cp.id}`} style={{fontWeight:600}}>Aplicar IVA 21% a este concepto</label>
+                <label htmlFor={`iva_${cp.id}`} style={{fontWeight:600}}>IVA 21% en este concepto</label>
               </div>
             </div>
           ))}
-          <button style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addC}>+ Agregar concepto</button>
+          <button type="button" style={{background:'#dbeafe',color:'#2563eb',padding:'9px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addC}>+ Agregar concepto</button>
         </div>}
 
         {modo==='simple'&&<div>
@@ -530,7 +659,7 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
               <div key={t.id} style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:6,border:'1px solid #e5e7eb'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                   <span style={{fontWeight:700,fontSize:14}}>Tramo {i+1}</span>
-                  {d.tramos.length>1&&<button style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delT(t.id)}>✕</button>}
+                  {d.tramos.length>1&&<button type="button" style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delT(t.id)}>✕</button>}
                 </div>
                 <div style={{display:'flex',gap:9,marginBottom:8}}>
                   <div style={{flex:1}}><label style={S.lbl}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upT(t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
@@ -558,7 +687,7 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
                 </div>
               </div>
             ))}
-            <button style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addT}>+ Agregar tramo</button>
+            <button type="button" style={{background:'#dbeafe',color:'#2563eb',padding:'8px 12px',borderRadius:10,fontSize:13,fontWeight:700,width:'100%',marginTop:4,cursor:'pointer',border:'none'}} onClick={addT}>+ Agregar tramo</button>
           </div>}
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',fontSize:14,marginBottom:8}}>
             <input type="checkbox" id="ck_iva" checked={d.iva} onChange={e=>up('iva',e.target.checked)} style={{width:17,height:17,accentColor:'#2563eb'}}/>
@@ -672,6 +801,25 @@ export default function Dashboard(){
 
   // ── TAB INICIO ──────────────────────────────
   const renderInicio=()=>{
+    // Detectar contratos por vencer (próximos 30 días)
+    const ahora=Date.now()
+    const dia=86400000
+    const contratosPorVencer=contratos.filter((c:any)=>{
+      if(c.activo===false||!c.fecha_fin)return false
+      const fin=new Date(c.fecha_fin).getTime()
+      const dias=Math.ceil((fin-ahora)/dia)
+      return dias>=0&&dias<=30
+    }).map((c:any)=>{
+      const fin=new Date(c.fecha_fin).getTime()
+      const dias=Math.ceil((fin-ahora)/dia)
+      return{...c,diasRestantes:dias}
+    })
+    const contratosVencidos=contratos.filter((c:any)=>{
+      if(c.activo===false||!c.fecha_fin)return false
+      const fin=new Date(c.fecha_fin).getTime()
+      return fin<ahora
+    })
+
     const rows=contratos.filter(c=>c.activo!==false).map(c=>{
       const mObj=calcM(c,NOW.getFullYear(),NOW.getMonth(),vars,[])
       const espP=toP(mObj,vm)
@@ -693,6 +841,16 @@ export default function Dashboard(){
           <div><p style={{fontSize:11,color:'#6b7280'}}>Mes actual</p><p style={{fontSize:16,fontWeight:800}}>{mlbl(NOW.getFullYear(),NOW.getMonth())}</p></div>
           {rows.length>0&&<div style={{textAlign:'right'}}><p style={{fontSize:10,color:'#6b7280'}}>Cobrado / Esperado</p><p style={{fontSize:13,fontWeight:700}}>{fmtN(totCob,'pesos')} / {fmtN(totEsp,'pesos')}</p></div>}
         </div>
+        {contratosVencidos.length>0&&<div style={{padding:'11px 13px',borderRadius:11,marginBottom:9,background:'#fee2e2',border:'1.5px solid #fca5a5',color:'#7f1d1d'}}>
+          <div style={{fontSize:13,fontWeight:800,marginBottom:4}}>🚨 {contratosVencidos.length} contrato{contratosVencidos.length>1?'s':''} VENCIDO{contratosVencidos.length>1?'S':''}</div>
+          {contratosVencidos.slice(0,3).map((c:any)=>(<div key={c.id} style={{fontSize:12}}>• {c.nombre_propiedad||c.propiedad_id} · {c.nombre_inquilino||'—'} · venció el {c.fecha_fin}</div>))}
+          {contratosVencidos.length>3&&<div style={{fontSize:11,marginTop:3}}>...y {contratosVencidos.length-3} más</div>}
+        </div>}
+        {contratosPorVencer.length>0&&<div style={{padding:'11px 13px',borderRadius:11,marginBottom:9,background:'#fef3c7',border:'1.5px solid #fbbf24',color:'#78350f'}}>
+          <div style={{fontSize:13,fontWeight:800,marginBottom:4}}>⏰ {contratosPorVencer.length} contrato{contratosPorVencer.length>1?'s':''} por vencer</div>
+          {contratosPorVencer.slice(0,3).map((c:any)=>(<div key={c.id} style={{fontSize:12}}>• {c.nombre_propiedad||c.propiedad_id} · {c.nombre_inquilino||'—'} · vence en {c.diasRestantes} día{c.diasRestantes!==1?'s':''} ({c.fecha_fin})</div>))}
+          {contratosPorVencer.length>3&&<div style={{fontSize:11,marginTop:3}}>...y {contratosPorVencer.length-3} más</div>}
+        </div>}
         {rows.length>0&&<div style={{display:'flex',gap:6,marginBottom:11}}>
           {[{n:np,l:'Pagados',c:'#16a34a'},{n:nx,l:'Parciales',c:'#d97706'},{n:nn,l:'Pendientes',c:'#dc2626'}].map((s,i)=>(
             <div key={i} style={{flex:1,background:'white',border:'1px solid #e5e7eb',borderRadius:10,padding:9,textAlign:'center',boxShadow:'0 1px 3px rgba(0,0,0,.07)'}}>
@@ -1201,7 +1359,7 @@ export default function Dashboard(){
       )}
 
       {modal?.type==='grupo'&&<FormGrupo
-        ini={modal.data}
+        ini={modal.data} grupos={grupos}
         onSave={async(d:any)=>{if(modal.data)await store.updGrupo(modal.data.id,d);else await store.addGrupo(d)}}
         onDelete={async()=>{if(modal.data)await store.delGrupo(modal.data.id)}}
         onClose={()=>setModal(null)}
@@ -1484,10 +1642,53 @@ function RenderImportar({store}:any){
 // ─── TAB GRUPOS ───────────────────────────────
 function RenderGrupos({store,setModal}:any){
   const {grupos,props}=store
+  // Construir árbol: padres primero
+  const padres=grupos.filter((g:any)=>!g.parent_id)
+  const hijosOf=(parentId:string)=>grupos.filter((g:any)=>g.parent_id===parentId)
+  
+  function GrupoCard({g,nivel}:{g:any,nivel:number}){
+    const propsDelGrupo=props.filter((p:any)=>p.grupo_id===g.id)
+    const totalPct=propsDelGrupo.reduce((s:number,p:any)=>s+(p.pct_expensas||0),0)
+    const subgrupos=hijosOf(g.id)
+    return(
+      <div style={{marginLeft:nivel*16}}>
+        <div style={S.card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:15}}>
+                {nivel>0&&<span style={{color:'#94a3b8',marginRight:5}}>↳</span>}
+                {g.nombre}
+              </div>
+              {g.direccion&&<div style={{fontSize:12,color:'#6b7280'}}>{g.direccion}</div>}
+              <div style={{display:'flex',gap:8,fontSize:12,marginTop:3,flexWrap:'wrap'}}>
+                <span style={{color:'#16a34a',fontWeight:600}}>{propsDelGrupo.length} prop.</span>
+                <span style={{color:'#6b7280'}}>Suma: {totalPct}%</span>
+                {subgrupos.length>0&&<span style={{color:'#7c3aed',fontWeight:600}}>{subgrupos.length} subgrupo{subgrupos.length>1?'s':''}</span>}
+              </div>
+            </div>
+            <button onClick={()=>setModal({type:'grupo',data:g})} style={{background:'#f3f4f6',color:'#111827',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Editar</button>
+          </div>
+          {propsDelGrupo.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
+            {propsDelGrupo.map((p:any)=>(
+              <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+                <span>• {p.codigo} · {p.nombre}</span>
+                <span style={{fontWeight:600,color:'#6b7280'}}>{p.pct_expensas||0}%</span>
+              </div>
+            ))}
+          </div>}
+          {totalPct!==100&&propsDelGrupo.length>0&&<div style={{padding:'6px 9px',borderRadius:7,fontSize:11,marginTop:6,background:'#fef3c7',color:'#78350f'}}>
+            ⚠️ La suma de % no llega a 100.
+          </div>}
+        </div>
+        {subgrupos.map((sub:any)=><GrupoCard key={sub.id} g={sub} nivel={nivel+1}/>)}
+      </div>
+    )
+  }
+  
   return(
     <div style={{padding:14}}>
       <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
-        💡 Los grupos te permiten agrupar propiedades por edificio, complejo, o cualquier criterio. Útil para distribuir expensas.
+        💡 Podés crear grupos y subgrupos. Ej: <strong>Edificio Belgrano</strong> → <strong>Planta Baja</strong>, <strong>Pisos 1-5</strong>, <strong>Cocheras</strong>. Útil para distribuir expensas con más detalle.
       </div>
       <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{grupos.length} grupos</p>
       {grupos.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}>
@@ -1495,50 +1696,31 @@ function RenderGrupos({store,setModal}:any){
         <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin grupos</div>
         <div style={{fontSize:13}}>Tocá + para crear uno (ej: Edificio Belgrano)</div>
       </div>}
-      {grupos.map((g:any)=>{
-        const propsDelGrupo=props.filter((p:any)=>p.grupo_id===g.id)
-        const totalPct=propsDelGrupo.reduce((s:number,p:any)=>s+(p.pct_expensas||0),0)
-        return(
-          <div key={g.id} style={S.card}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:15}}>{g.nombre}</div>
-                {g.direccion&&<div style={{fontSize:12,color:'#6b7280'}}>{g.direccion}</div>}
-                <div style={{fontSize:12,color:'#16a34a',fontWeight:600,marginTop:3}}>
-                  {propsDelGrupo.length} propiedad{propsDelGrupo.length!==1?'es':''} · Suma %: {totalPct}%
-                </div>
-              </div>
-              <button onClick={()=>setModal({type:'grupo',data:g})} style={{background:'#f3f4f6',color:'#111827',padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer'}}>Editar</button>
-            </div>
-            {propsDelGrupo.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
-              {propsDelGrupo.map((p:any)=>(
-                <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
-                  <span>• {p.codigo} · {p.nombre}</span>
-                  <span style={{fontWeight:600,color:'#6b7280'}}>{p.pct_expensas||0}%</span>
-                </div>
-              ))}
-            </div>}
-            {totalPct!==100&&propsDelGrupo.length>0&&<div style={{padding:'6px 9px',borderRadius:7,fontSize:11,marginTop:6,background:'#fef3c7',color:'#78350f'}}>
-              ⚠️ La suma de % no llega a 100. Revisá los porcentajes en cada propiedad.
-            </div>}
-          </div>
-        )
-      })}
+      {padres.map((g:any)=><GrupoCard key={g.id} g={g} nivel={0}/>)}
       <div style={{height:70}}/>
     </div>
   )
 }
 
-function FormGrupo({ini,onSave,onDelete,onClose}:any){
-  const [d,setD]=useState(ini||{nombre:'',direccion:'',descripcion:''})
+function FormGrupo({ini,grupos,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{nombre:'',direccion:'',descripcion:'',parent_id:''})
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const ok=d.nombre.trim()
+  // Excluir self y descendientes para evitar ciclos
+  const posiblesPadres=(grupos||[]).filter((g:any)=>!ini||g.id!==ini.id)
   return(
     <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
       <div style={S.modalBox}>
         <div style={S.handle}/>
         <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar grupo':'Nuevo grupo'}</div>
-        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: Edificio Belgrano" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: Edificio Belgrano / Planta Baja" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>🏢 Pertenece a otro grupo (opcional)</label>
+          <select style={S.sel} value={d.parent_id||''} onChange={e=>up('parent_id',e.target.value||null)}>
+            <option value="">— Es un grupo principal —</option>
+            {posiblesPadres.map((g:any)=><option key={g.id} value={g.id}>{g.nombre}</option>)}
+          </select>
+          <div style={{fontSize:11,color:'#64748b',marginTop:5}}>Útil para crear subgrupos. Ej: Edificio Belgrano → Planta Baja, Pisos 1-5, Cocheras.</div>
+        </div>
         <div style={S.fg}><label style={S.lbl}>Dirección</label><input style={S.inp} value={d.direccion||''} onChange={e=>up('direccion',e.target.value)}/></div>
         <div style={S.fg}><label style={S.lbl}>Descripción / Notas</label><textarea style={{...S.inp,resize:'none'}} rows={2} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)}/></div>
         <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
