@@ -26,7 +26,18 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   function debeAj(fr:string){if(!fr||fr==='mensual')return true;if(fr==='trimestral')return (mr-1)%3===0;if(fr==='semestral')return (mr-1)%6===0;if(fr==='anual')return (mr-1)%12===0;return true}
   function calcEscalonado(tramos:any[]){
     if(!tramos||tramos.length===0)return null
-    const t=tramos.find((tr:any)=>mr>=tr.mesDesde&&mr<=tr.mesHasta)
+    // Soporta ambos formatos: por mes (legacy) o por fecha (nuevo)
+    const mesDelCalc=new Date(y,m,15).getTime()
+    const t=tramos.find((tr:any)=>{
+      // Si tiene fechas, usar fechas
+      if(tr.fechaDesde&&tr.fechaHasta){
+        const d1=new Date(tr.fechaDesde+'T00:00:00').getTime()
+        const d2=new Date(tr.fechaHasta+'T23:59:59').getTime()
+        return mesDelCalc>=d1&&mesDelCalc<=d2
+      }
+      // Legacy: por número de mes desde inicio de contrato
+      return mr>=tr.mesDesde&&mr<=tr.mesHasta
+    })
     return t||null
   }
   function cb(base:number,mon:string,aj:string,iid:string,fr:string,iva:boolean){
@@ -388,7 +399,7 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
     propiedad_id:'',propiedades_ids:[],inquilino_id:'',
     fecha_inicio:new Date().toISOString().slice(0,10),fecha_fin:'',
     activo:true,tipo:'fijo',moneda:'pesos',monto_base:'',ajuste:'ninguno',frec_ajuste:'mensual',iva:false,
-    tramos:[{id:uid(),mesDesde:1,mesHasta:6,montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}],
+    tramos:[{id:uid(),fechaDesde:new Date().toISOString().slice(0,10),fechaHasta:new Date(new Date().setMonth(new Date().getMonth()+6)).toISOString().slice(0,10),montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}],
     conceptos:[]
   })
 
@@ -411,7 +422,18 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
 
   // Tramos del modo simple escalonado
   const upT=(tid:string,f:string,v:any)=>setD((p:any)=>({...p,tramos:p.tramos.map((t:any)=>t.id===tid?{...t,[f]:v}:t)}))
-  const addT=()=>setD((p:any)=>{const last=p.tramos[p.tramos.length-1];const desde=last?last.mesHasta+1:1;return{...p,tramos:[...p.tramos,{id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:p.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}})
+  const addT=()=>setD((p:any)=>{
+    const last=p.tramos[p.tramos.length-1]
+    let fechaDesde=p.fecha_inicio||new Date().toISOString().slice(0,10)
+    let fechaHasta=new Date(new Date(fechaDesde).setMonth(new Date(fechaDesde).getMonth()+6)).toISOString().slice(0,10)
+    if(last?.fechaHasta){
+      const next=new Date(last.fechaHasta);next.setDate(next.getDate()+1)
+      fechaDesde=next.toISOString().slice(0,10)
+      const fin=new Date(fechaDesde);fin.setMonth(fin.getMonth()+6)
+      fechaHasta=fin.toISOString().slice(0,10)
+    }
+    return{...p,tramos:[...p.tramos,{id:uid(),fechaDesde,fechaHasta,montoBase:'',moneda:p.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}
+  })
   const delT=(tid:string)=>setD((p:any)=>({...p,tramos:p.tramos.filter((t:any)=>t.id!==tid)}))
 
   // Conceptos
@@ -424,8 +446,15 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
     if(cp.id!==cid)return cp
     const tramos=cp.tramos||[]
     const last=tramos[tramos.length-1]
-    const desde=last?last.mesHasta+1:1
-    return{...cp,tramos:[...tramos,{id:uid(),mesDesde:desde,mesHasta:desde+5,montoBase:'',moneda:cp.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}
+    let fechaDesde=p.fecha_inicio||new Date().toISOString().slice(0,10)
+    let fechaHasta=new Date(new Date(fechaDesde).setMonth(new Date(fechaDesde).getMonth()+6)).toISOString().slice(0,10)
+    if(last?.fechaHasta){
+      const next=new Date(last.fechaHasta);next.setDate(next.getDate()+1)
+      fechaDesde=next.toISOString().slice(0,10)
+      const fin=new Date(fechaDesde);fin.setMonth(fin.getMonth()+6)
+      fechaHasta=fin.toISOString().slice(0,10)
+    }
+    return{...cp,tramos:[...tramos,{id:uid(),fechaDesde,fechaHasta,montoBase:'',moneda:cp.moneda||'pesos',ajuste:'ninguno',frecAjuste:'mensual'}]}
   })}))
   const upCT=(cid:string,tid:string,f:string,v:any)=>setD((p:any)=>({...p,conceptos:p.conceptos.map((cp:any)=>{
     if(cp.id!==cid)return cp
@@ -588,8 +617,8 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
                       {cp.tramos.length>1&&<button type="button" style={{background:'#fee2e2',color:'#7f1d1d',padding:'2px 6px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delCT(cp.id,t.id)}>✕</button>}
                     </div>
                     <div style={{display:'flex',gap:7,marginBottom:6}}>
-                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upCT(cp.id,t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
-                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>Hasta mes</label><input style={S.inp} type="number" min={1} value={t.mesHasta} onChange={e=>upCT(cp.id,t.id,'mesHasta',parseInt(e.target.value)||12)}/></div>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>📅 Desde</label><input style={S.inp} type="date" value={t.fechaDesde||''} onChange={e=>upCT(cp.id,t.id,'fechaDesde',e.target.value)}/></div>
+                      <div style={{flex:1}}><label style={{...S.lbl,fontSize:10}}>📅 Hasta</label><input style={S.inp} type="date" value={t.fechaHasta||''} onChange={e=>upCT(cp.id,t.id,'fechaHasta',e.target.value)}/></div>
                     </div>
                     <div style={{...S.fg,marginBottom:6}}><label style={{...S.lbl,fontSize:10}}>Monto</label>
                       <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:8,overflow:'hidden'}}>
@@ -662,8 +691,8 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
                   {d.tramos.length>1&&<button type="button" style={{background:'#fee2e2',color:'#7f1d1d',padding:'3px 8px',borderRadius:6,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}} onClick={()=>delT(t.id)}>✕</button>}
                 </div>
                 <div style={{display:'flex',gap:9,marginBottom:8}}>
-                  <div style={{flex:1}}><label style={S.lbl}>Desde mes</label><input style={S.inp} type="number" min={1} value={t.mesDesde} onChange={e=>upT(t.id,'mesDesde',parseInt(e.target.value)||1)}/></div>
-                  <div style={{flex:1}}><label style={S.lbl}>Hasta mes</label><input style={S.inp} type="number" min={1} value={t.mesHasta} onChange={e=>upT(t.id,'mesHasta',parseInt(e.target.value)||12)}/></div>
+                  <div style={{flex:1}}><label style={S.lbl}>📅 Desde</label><input style={S.inp} type="date" value={t.fechaDesde||''} onChange={e=>upT(t.id,'fechaDesde',e.target.value)}/></div>
+                  <div style={{flex:1}}><label style={S.lbl}>📅 Hasta</label><input style={S.inp} type="date" value={t.fechaHasta||''} onChange={e=>upT(t.id,'fechaHasta',e.target.value)}/></div>
                 </div>
                 <div style={S.fg}><label style={S.lbl}>Monto</label>
                   <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
@@ -1353,7 +1382,15 @@ export default function Dashboard(){
           <div style={S.modalBox}>
             <div style={S.handle}/>
             <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>Registrar Gasto</div>
-            <GastoForm props={props} onSave={async(d:any)=>{await store.addGasto(d);setModal(null)}} onClose={()=>setModal(null)}/>
+            <GastoForm props={props} grupos={grupos} onSave={async(d:any)=>{
+              if(Array.isArray(d)){
+                // Multiple gastos del grupo
+                for(const g of d){await store.addGasto(g)}
+              } else {
+                await store.addGasto(d)
+              }
+              setModal(null)
+            }} onClose={()=>setModal(null)}/>
           </div>
         </div>
       )}
@@ -1390,17 +1427,43 @@ export default function Dashboard(){
   )
 }
 
-function GastoForm({props,onSave,onClose}:any){
-  const [d,setD]=useState({propiedad_id:'',tipo:'arreglo',monto:'',moneda:'pesos',quien:'propietario',estado:'pendiente',descripcion:''})
+function GastoForm({props,grupos,onSave,onClose}:any){
+  const [d,setD]=useState<any>({alcance:'propiedad',propiedad_id:'',grupo_id:'',tipo:'arreglo',monto:'',moneda:'pesos',quien:'propietario',estado:'pendiente',descripcion:''})
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
-  const ok=d.propiedad_id&&d.monto
+  const ok=d.monto&&((d.alcance==='propiedad'&&d.propiedad_id)||(d.alcance==='grupo'&&d.grupo_id))
+  const propsDelGrupo=d.grupo_id?props.filter((p:any)=>p.grupo_id===d.grupo_id):[]
+  const monto=parseFloat(d.monto)||0
+  
   return(<>
-    <div style={S.fg}><label style={S.lbl}>Propiedad</label>
+    {/* Alcance */}
+    <div style={S.fg}><label style={S.lbl}>¿A qué se aplica el gasto?</label>
+      <div style={{display:'flex',gap:6}}>
+        <button type="button" onClick={()=>up('alcance','propiedad')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.alcance==='propiedad'?'#2563eb':'#e5e7eb'}`,background:d.alcance==='propiedad'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.alcance==='propiedad'?'#2563eb':'#64748b',cursor:'pointer'}}>
+          🏢 Una propiedad<div style={{fontSize:10,fontWeight:500,marginTop:2}}>específica</div>
+        </button>
+        <button type="button" onClick={()=>up('alcance','grupo')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.alcance==='grupo'?'#2563eb':'#e5e7eb'}`,background:d.alcance==='grupo'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.alcance==='grupo'?'#2563eb':'#64748b',cursor:'pointer'}}>
+          🏘️ Un grupo<div style={{fontSize:10,fontWeight:500,marginTop:2}}>distribuir por %</div>
+        </button>
+      </div>
+    </div>
+
+    {d.alcance==='propiedad'&&<div style={S.fg}><label style={S.lbl}>Propiedad</label>
       <select style={S.sel} value={d.propiedad_id} onChange={e=>up('propiedad_id',e.target.value)}>
         <option value="">— Seleccionar —</option>
         {props.filter((p:any)=>p.activo).map((p:any)=><option key={p.id} value={p.id}>{p.codigo} · {p.nombre}</option>)}
       </select>
-    </div>
+    </div>}
+
+    {d.alcance==='grupo'&&<div style={S.fg}><label style={S.lbl}>Grupo / Edificio</label>
+      <select style={S.sel} value={d.grupo_id} onChange={e=>up('grupo_id',e.target.value)}>
+        <option value="">— Seleccionar —</option>
+        {(grupos||[]).map((g:any)=><option key={g.id} value={g.id}>{g.nombre}</option>)}
+      </select>
+      {d.grupo_id&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:11,marginTop:8,background:'#dbeafe',color:'#1e3a8a'}}>
+        💡 El gasto se distribuirá entre las {propsDelGrupo.length} propiedades del grupo según el % de expensas asignado.
+      </div>}
+    </div>}
+
     <div style={S.fg}><label style={S.lbl}>Tipo</label>
       <select style={S.sel} value={d.tipo} onChange={e=>up('tipo',e.target.value)}>
         <option value="arreglo">Arreglo/Reparación</option><option value="expensas">Expensas</option><option value="servicio">Servicio</option><option value="impuesto">Impuesto</option><option value="otro">Otro</option>
@@ -1414,6 +1477,21 @@ function GastoForm({props,onSave,onClose}:any){
         <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" value={d.monto} onChange={e=>up('monto',e.target.value)}/>
       </div>
     </div>
+
+    {d.alcance==='grupo'&&d.grupo_id&&propsDelGrupo.length>0&&monto>0&&<div style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:11}}>
+      <div style={{fontSize:11,fontWeight:700,color:'#6b7280',marginBottom:5}}>Distribución automática:</div>
+      {propsDelGrupo.map((p:any)=>{
+        const pct=p.pct_expensas||0
+        const m=monto*pct/100
+        return(
+          <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
+            <span>{p.codigo} ({pct}%)</span>
+            <span style={{fontWeight:600}}>{fmtN(m,'pesos')}</span>
+          </div>
+        )
+      })}
+    </div>}
+
     <div style={{display:'flex',gap:9,marginBottom:11}}>
       <div style={{flex:1}}><label style={S.lbl}>¿Quién paga?</label>
         <select style={S.sel} value={d.quien} onChange={e=>up('quien',e.target.value)}>
@@ -1426,8 +1504,24 @@ function GastoForm({props,onSave,onClose}:any){
         </select>
       </div>
     </div>
-    <div style={S.fg}><label style={S.lbl}>Descripción</label><input style={S.sel} value={d.descripcion} onChange={e=>up('descripcion',e.target.value)}/></div>
-    <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok)onSave({...d,monto:parseFloat(d.monto),fecha:new Date().toISOString().slice(0,10)})}}>Guardar gasto</button>
+    <div style={S.fg}><label style={S.lbl}>Descripción</label><input style={S.inp} value={d.descripcion} onChange={e=>up('descripcion',e.target.value)}/></div>
+    <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{
+      if(!ok)return
+      const base={tipo:d.tipo,monto:parseFloat(d.monto),moneda:d.moneda,quien:d.quien,estado:d.estado,descripcion:d.descripcion,fecha:new Date().toISOString().slice(0,10)}
+      if(d.alcance==='propiedad'){
+        onSave({...base,propiedad_id:d.propiedad_id})
+      } else {
+        // Crear un gasto por cada propiedad del grupo distribuyendo por %
+        const items=propsDelGrupo.filter((p:any)=>p.pct_expensas>0).map((p:any)=>({
+          ...base,
+          propiedad_id:p.id,
+          monto:parseFloat(d.monto)*p.pct_expensas/100,
+          descripcion:`${d.descripcion||'Gasto del grupo'} (${p.pct_expensas}%)`,
+          grupo_id:d.grupo_id
+        }))
+        onSave(items)
+      }
+    }}>Guardar gasto</button>
     <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
   </>)
 }
