@@ -92,6 +92,7 @@ function useAppData(workspaceId:string, userId:string){
   const [grupos,setGrupos]=useState<any[]>([])
   const [owners,setOwners]=useState<any[]>([])
   const [indices,setIndices]=useState<any[]>([])
+  const [varsCustom,setVarsCustom]=useState<any[]>([])
   const [expensas,setExpensas]=useState<any[]>([])
   const [loading,setLoading]=useState(true)
 
@@ -100,7 +101,7 @@ function useAppData(workspaceId:string, userId:string){
   async function loadAll(){
     if(!workspaceId)return
     setLoading(true)
-    const [p,i,c,pg,g,gr,ow,ix,ex]=await Promise.all([
+    const [p,i,c,pg,g,gr,ow,ix,ex,vc]=await Promise.all([
       sb.from('propiedades').select('*').eq('workspace_id',workspaceId),
       sb.from('inquilinos').select('*').eq('workspace_id',workspaceId),
       sb.from('contratos').select('*').eq('workspace_id',workspaceId),
@@ -110,13 +111,15 @@ function useAppData(workspaceId:string, userId:string){
       sb.from('propietarios').select('*').eq('workspace_id',workspaceId),
       sb.from('indices').select('*').eq('workspace_id',workspaceId),
       sb.from('expensas').select('*').eq('workspace_id',workspaceId),
+      sb.from('variables_custom').select('*').eq('workspace_id',workspaceId),
     ])
     setProps(p.data||[]);setInqs(i.data||[]);setContratos(c.data||[])
     setPagos(pg.data||[]);setGastos(g.data||[]);setGrupos(gr.data||[])
     setOwners(ow.data||[]);setIndices(ix.data||[]);setExpensas(ex.data||[])
+    setVarsCustom(vc.data||[])
     const vRes=await sb.from('variables').select('*').eq('workspace_id',workspaceId)
     const vMap:any={}
-    ;(vRes.data||[]).forEach((v:any)=>{vMap[v.periodo]={dolar:v.dolar,nafta:v.nafta,ipc:v.ipc}})
+    ;(vRes.data||[]).forEach((v:any)=>{vMap[v.periodo]={dolar:v.dolar,nafta:v.nafta,ipc:v.ipc,valores_custom:v.valores_custom||{}}})
     setVars(vMap)
     setLoading(false)
   }
@@ -137,6 +140,25 @@ function useAppData(workspaceId:string, userId:string){
   async function setVar(periodo:string,field:string,val:number){
     await sb.from('variables').upsert({...ws,periodo,[field]:val},{onConflict:'workspace_id,periodo'})
     setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),[field]:val}}))
+  }
+  async function setVarCustom(periodo:string,customId:string,val:number){
+    const current=vars[periodo]?.valores_custom||{}
+    const nuevo={...current,[customId]:val}
+    await sb.from('variables').upsert({...ws,periodo,valores_custom:nuevo},{onConflict:'workspace_id,periodo'})
+    setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),valores_custom:nuevo}}))
+  }
+  async function addVarCustom(d:any){
+    const{data,error}=await sb.from('variables_custom').insert({...d,...ws}).select().single()
+    if(!error&&data)setVarsCustom(p=>[...p,data])
+    return data
+  }
+  async function delVarCustom(id:string){
+    await sb.from('variables_custom').delete().eq('id',id)
+    setVarsCustom(p=>p.filter(x=>x.id!==id))
+  }
+  async function updVarCustom(id:string,d:any){
+    await sb.from('variables_custom').update(d).eq('id',id)
+    setVarsCustom(p=>p.map(x=>x.id===id?{...x,...d}:x))
   }
   async function addGasto(d:any){const{data}=await sb.from('gastos').insert({...d,...ws}).select().single();if(data)setGastos(p=>[...p,data]);return data}
   async function delGasto(id:string){await sb.from('gastos').delete().eq('id',id);setGastos(p=>p.filter(x=>x.id!==id))}
@@ -167,9 +189,10 @@ function useAppData(workspaceId:string, userId:string){
   async function updIndice(id:string,d:any){await sb.from('indices').update(d).eq('id',id);setIndices(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delIndice(id:string){await sb.from('indices').delete().eq('id',id);setIndices(p=>p.filter(x=>x.id!==id))}
 
-  return{props,inqs,contratos,pagos,vars,gastos,grupos,owners,indices,expensas,loading,
+  return{props,inqs,contratos,pagos,vars,gastos,grupos,owners,indices,varsCustom,expensas,loading,
     addProp,updProp,delProp,addInq,updInq,delInq,addContrato,updContrato,delContrato,
-    addPago,delPago,setVar,addGasto,delGasto,addGrupo,updGrupo,delGrupo,
+    addPago,delPago,setVar,setVarCustom,addVarCustom,updVarCustom,delVarCustom,
+    addGasto,delGasto,addGrupo,updGrupo,delGrupo,
     addOwner,updOwner,delOwner,addExpensa,updExpensa,delExpensa,
     addIndice,updIndice,delIndice,bulkImport,reload:loadAll}
 }
@@ -402,6 +425,8 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
     tramos:[{id:uid(),fechaDesde:new Date().toISOString().slice(0,10),fechaHasta:new Date(new Date().setMonth(new Date().getMonth()+6)).toISOString().slice(0,10),montoBase:'',moneda:'pesos',ajuste:'ninguno',frecAjuste:'mensual'}],
     conceptos:[]
   })
+  const [propSearch,setPropSearch]=useState('')
+  const [inqSearch,setInqSearch]=useState('')
 
   // Inicializar propiedades_ids desde propiedad_id si viene legacy
   useEffect(()=>{
@@ -527,29 +552,60 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
           <div style={{padding:'8px 10px',borderRadius:8,fontSize:11,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>
             Marcá una o varias propiedades (ej: dos locales que se alquilan juntos)
           </div>
-          {propsActivas.length===0?<div style={{padding:10,fontSize:12,color:'#78350f',background:'#fef3c7',borderRadius:8}}>No hay propiedades activas. Creá una primero.</div>:
-          <div style={{maxHeight:180,overflowY:'auto',background:'white',border:'1px solid #e5e7eb',borderRadius:9,padding:6}}>
-            {propsActivas.map((p:any)=>{
-              const sel=propsSeleccionadas.includes(p.id)
-              return(
-                <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'7px 9px',borderRadius:7,cursor:'pointer',background:sel?'#dbeafe':'transparent',marginBottom:2}}>
-                  <input type="checkbox" checked={sel} onChange={()=>toggleProp(p.id)} style={{width:16,height:16,accentColor:'#2563eb'}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{p.codigo} · {p.nombre}</div>
-                    {p.direccion&&<div style={{fontSize:11,color:'#64748b'}}>{p.direccion}</div>}
-                  </div>
-                </label>
-              )
-            })}
-          </div>}
+          {propsActivas.length===0?<div style={{padding:10,fontSize:12,color:'#78350f',background:'#fef3c7',borderRadius:8}}>No hay propiedades activas. Creá una primero.</div>:<>
+            <div style={{position:'relative',marginBottom:6}}>
+              <input style={{...S.inp,paddingLeft:32,fontSize:13}} placeholder="🔍 Buscar..." value={propSearch} onChange={e=>setPropSearch(e.target.value)}/>
+              {propSearch&&<button type="button" onClick={()=>setPropSearch('')} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'#f3f4f6',border:'none',color:'#64748b',fontSize:12,cursor:'pointer',padding:'2px 7px',borderRadius:5}}>✕</button>}
+            </div>
+            <div style={{maxHeight:180,overflowY:'auto',background:'white',border:'1px solid #e5e7eb',borderRadius:9,padding:6}}>
+              {(()=>{
+                const q=propSearch.toLowerCase().trim()
+                const lista=q?propsActivas.filter((p:any)=>((p.codigo||'')+' '+(p.nombre||'')+' '+(p.direccion||'')).toLowerCase().includes(q)):propsActivas
+                if(lista.length===0)return<div style={{textAlign:'center',padding:18,color:'#94a3b8',fontSize:12}}>Sin resultados</div>
+                return lista.map((p:any)=>{
+                  const sel=propsSeleccionadas.includes(p.id)
+                  return(
+                    <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'7px 9px',borderRadius:7,cursor:'pointer',background:sel?'#dbeafe':'transparent',marginBottom:2}}>
+                      <input type="checkbox" checked={sel} onChange={()=>toggleProp(p.id)} style={{width:16,height:16,accentColor:'#2563eb'}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{p.codigo} · {p.nombre}</div>
+                        {p.direccion&&<div style={{fontSize:11,color:'#64748b'}}>{p.direccion}</div>}
+                      </div>
+                    </label>
+                  )
+                })
+              })()}
+            </div>
+          </>}
           {propsSeleccionadas.length>1&&<div style={{marginTop:7,padding:'6px 9px',background:'#dcfce7',color:'#14532d',borderRadius:7,fontSize:11,fontWeight:600}}>✓ {propsSeleccionadas.length} propiedades seleccionadas</div>}
         </div>
 
         <div style={S.fg}><label style={S.lbl}>👤 Inquilino</label>
-          <select style={S.sel} value={d.inquilino_id} onChange={e=>up('inquilino_id',e.target.value)}>
+          {inqs.length>5?<>
+            <div style={{position:'relative',marginBottom:6}}>
+              <input style={{...S.inp,fontSize:13}} placeholder="🔍 Buscar inquilino..." value={inqSearch} onChange={e=>setInqSearch(e.target.value)}/>
+              {inqSearch&&<button type="button" onClick={()=>setInqSearch('')} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'#f3f4f6',border:'none',color:'#64748b',fontSize:12,cursor:'pointer',padding:'2px 7px',borderRadius:5}}>✕</button>}
+            </div>
+            <div style={{maxHeight:160,overflowY:'auto',background:'white',border:'1px solid #e5e7eb',borderRadius:9,padding:4}}>
+              {(()=>{
+                const q=inqSearch.toLowerCase().trim()
+                const lista=q?inqs.filter((i:any)=>((i.nombre||'')+' '+(i.email||'')+' '+(i.telefono||'')+' '+(i.dni||'')+' '+(i.cuit||'')).toLowerCase().includes(q)):inqs
+                if(lista.length===0)return<div style={{textAlign:'center',padding:14,color:'#94a3b8',fontSize:12}}>Sin resultados</div>
+                return lista.map((i:any)=>(
+                  <button key={i.id} type="button" onClick={()=>up('inquilino_id',i.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:9,padding:'7px 9px',borderRadius:7,cursor:'pointer',background:d.inquilino_id===i.id?'#dbeafe':'transparent',border:'none',textAlign:'left',marginBottom:1}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{i.nombre}{i.es_sociedad?' 🏢':''}</div>
+                      {(i.telefono||i.email)&&<div style={{fontSize:11,color:'#64748b'}}>{i.telefono||i.email}</div>}
+                    </div>
+                    {d.inquilino_id===i.id&&<span style={{color:'#2563eb',fontWeight:700}}>✓</span>}
+                  </button>
+                ))
+              })()}
+            </div>
+          </>:<select style={S.sel} value={d.inquilino_id} onChange={e=>up('inquilino_id',e.target.value)}>
             <option value="">— Seleccionar —</option>
             {inqs.map((i:any)=><option key={i.id} value={i.id}>{i.nombre}{i.es_sociedad?' 🏢':''}</option>)}
-          </select>
+          </select>}
         </div>
 
         <div style={{display:'flex',gap:9,marginBottom:11}}>
@@ -742,6 +798,8 @@ export default function Dashboard(){
   const [tab,setTab]=useState('inicio')
   const [modal,setModal]=useState<any>(null)
   const [authLoading,setAuthLoading]=useState(true)
+  const [searchProps,setSearchProps]=useState('')
+  const [searchInqs,setSearchInqs]=useState('')
 
   async function loadUserAndWorkspaces(uid:string){
     const{data:userRow}=await sb.from('usuarios').select('*').eq('id',uid).single()
@@ -814,7 +872,6 @@ export default function Dashboard(){
     {id:'grupos',ico:'🏘️',lbl:'Grupos'},
     {id:'expensas',ico:'💸',lbl:'Expensas'},
     {id:'owners',ico:'👔',lbl:'Dueños'},
-    {id:'indices',ico:'📏',lbl:'Índices'},
     {id:'vars',ico:'📈',lbl:'Variables'},
     {id:'gastos',ico:'🔧',lbl:'Gastos'},
     {id:'reporte',ico:'📊',lbl:'Reporte'},
@@ -938,18 +995,31 @@ export default function Dashboard(){
   }
 
   // ── TAB PROPS ───────────────────────────────
-  const renderProps=()=>(
+  const renderProps=()=>{
+    const q=searchProps.toLowerCase().trim()
+    const propsFiltered=q?props.filter((p:any)=>(
+      (p.codigo||'').toLowerCase().includes(q)||
+      (p.nombre||'').toLowerCase().includes(q)||
+      (p.direccion||'').toLowerCase().includes(q)||
+      (p.ciudad||'').toLowerCase().includes(q)
+    )):props
+    return(
     <div style={{padding:'18px 14px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <div>
           <h2 style={{fontSize:22,fontWeight:800,color:'#0f172a',margin:0}}>Propiedades</h2>
-          <p style={{fontSize:13,color:'#64748b',margin:'2px 0 0'}}>{props.length} propiedad{props.length!==1?'es':''}{grupos.length>0?` · ${grupos.length} grupos`:''}</p>
+          <p style={{fontSize:13,color:'#64748b',margin:'2px 0 0'}}>{props.length} propiedad{props.length!==1?'es':''}{grupos.length>0?` · ${grupos.length} grupos`:''}{q?` · ${propsFiltered.length} resultados`:''}</p>
         </div>
         <button onClick={()=>setModal({type:'prop',data:null})} style={{background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',padding:'9px 16px',borderRadius:10,fontSize:13,fontWeight:700,border:'none',cursor:'pointer',boxShadow:'0 4px 10px rgba(37,99,235,.25)'}}>+ Nueva</button>
       </div>
+      <div style={{position:'relative',marginBottom:14}}>
+        <input style={{...S.inp,paddingLeft:36}} placeholder="🔍 Buscar por código, nombre, dirección..." value={searchProps} onChange={e=>setSearchProps(e.target.value)}/>
+        {searchProps&&<button onClick={()=>setSearchProps('')} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'#f3f4f6',border:'none',color:'#64748b',fontSize:14,cursor:'pointer',padding:'2px 8px',borderRadius:6}}>✕</button>}
+      </div>
       {props.length===0&&<div style={{textAlign:'center',padding:'60px 20px',color:'#64748b',background:'white',borderRadius:14,border:'1px solid #e5e7eb'}}><div style={{fontSize:48,marginBottom:12}}>🏢</div><div style={{fontSize:16,fontWeight:600,color:'#0f172a',marginBottom:6}}>Sin propiedades</div><div style={{fontSize:13}}>Tocá "Nueva" para agregar la primera</div></div>}
+      {propsFiltered.length===0&&props.length>0&&<div style={{textAlign:'center',padding:'30px 20px',color:'#64748b'}}>No hay resultados para "{searchProps}"</div>}
       <div className="pc-grid-2">
-      {props.map((p:any)=>{
+      {propsFiltered.map((p:any)=>{
         const aa=contratos.find(c=>c.propiedad_id===p.id&&c.activo!==false)
         const grupo=grupos.find((g:any)=>g.id===p.grupo_id)
         return(
@@ -975,14 +1045,29 @@ export default function Dashboard(){
       </div>
       <div style={{height:80}}/>
     </div>
-  )
+    )
+  }
 
   // ── TAB INQS ────────────────────────────────
-  const renderInqs=()=>(
+  const renderInqs=()=>{
+    const q=searchInqs.toLowerCase().trim()
+    const inqsFiltered=q?inqs.filter((i:any)=>(
+      (i.nombre||'').toLowerCase().includes(q)||
+      (i.email||'').toLowerCase().includes(q)||
+      (i.telefono||'').toLowerCase().includes(q)||
+      (i.cuit||'').toLowerCase().includes(q)||
+      (i.dni||'').toLowerCase().includes(q)
+    )):inqs
+    return(
     <div style={{padding:14}}>
-      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{inqs.length} inquilinos</p>
+      <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 9px'}}>{inqs.length} inquilinos{q?` · ${inqsFiltered.length} resultados`:''}</p>
+      <div style={{position:'relative',marginBottom:11}}>
+        <input style={{...S.inp,paddingLeft:36}} placeholder="🔍 Buscar por nombre, email, teléfono, DNI..." value={searchInqs} onChange={e=>setSearchInqs(e.target.value)}/>
+        {searchInqs&&<button onClick={()=>setSearchInqs('')} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'#f3f4f6',border:'none',color:'#64748b',fontSize:14,cursor:'pointer',padding:'2px 8px',borderRadius:6}}>✕</button>}
+      </div>
       {inqs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'#6b7280'}}><div style={{fontSize:40,marginBottom:8}}>👤</div><div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin inquilinos</div></div>}
-      {inqs.map((inq:any)=>{
+      {inqsFiltered.length===0&&inqs.length>0&&<div style={{textAlign:'center',padding:'30px 20px',color:'#64748b'}}>No hay resultados para "{searchInqs}"</div>}
+      {inqsFiltered.map((inq:any)=>{
         const aa=contratos.filter(c=>c.inquilino_id===inq.id&&c.activo!==false).length
         const tel=inq.es_sociedad&&inq.tel_contacto?inq.tel_contacto:inq.telefono
         return(
@@ -1004,7 +1089,8 @@ export default function Dashboard(){
       })}
       <div style={{height:70}}/>
     </div>
-  )
+    )
+  }
 
   // ── TAB CONTRATOS ───────────────────────────
   const renderContratos=()=>(
@@ -1044,15 +1130,43 @@ export default function Dashboard(){
     const meses=[]
     for(let i=-1;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mk(d.getFullYear(),d.getMonth())})}
     const fields=[{id:'dolar',l:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',l:'Nafta ($ por litro)',ph:'950'},{id:'ipc',l:'IPC variación (%)',ph:'4.5'}]
+    const customs=store.varsCustom||[]
     return(
       <div style={{padding:14}}>
-        <div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>Cargá una vez por mes. Se aplican automáticamente a todos los contratos.</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
+          <div>
+            <h2 style={{fontSize:19,fontWeight:800,color:'#0f172a',margin:0}}>Variables</h2>
+            <p style={{fontSize:12,color:'#64748b',margin:'2px 0 0'}}>Datos del mes que se aplican a los contratos</p>
+          </div>
+          <button onClick={()=>setModal({type:'varCustom',data:null})} style={{background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',padding:'8px 14px',borderRadius:9,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}}>+ Nueva variable</button>
+        </div>
+        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:11,background:'#dbeafe',color:'#1e3a8a'}}>💡 Cargá los valores de cada mes. Las variables predefinidas (Dólar, Nafta, IPC) ya están creadas. Podés agregar las tuyas (ej: aumento del consorcio, ICL).</div>
+        
+        {/* Variables custom: header con opciones */}
+        {customs.length>0&&<div style={{background:'white',borderRadius:11,border:'1px solid #e5e7eb',padding:10,marginBottom:11}}>
+          <div style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,marginBottom:7}}>Variables propias</div>
+          {customs.map((cv:any)=>(
+            <div key={cv.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid #f3f4f6'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600}}>{cv.nombre}</div>
+                {cv.descripcion&&<div style={{fontSize:11,color:'#6b7280'}}>{cv.descripcion}</div>}
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button onClick={()=>setModal({type:'varCustom',data:cv})} style={{background:'#f3f4f6',color:'#111827',padding:'4px 9px',borderRadius:6,fontSize:11,fontWeight:600,border:'none',cursor:'pointer'}}>Editar</button>
+                <button onClick={async()=>{if(confirm('¿Eliminar esta variable? Los valores cargados se conservarán.'))await store.delVarCustom(cv.id)}} style={{background:'#fee2e2',color:'#7f1d1d',padding:'4px 9px',borderRadius:6,fontSize:11,fontWeight:600,border:'none',cursor:'pointer'}}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>}
+
+        {/* Cards por mes */}
         {meses.map(m=>{
           const v=(vars&&vars[m.key])||{}
           const ea=m.key===mesActK
+          const valoresCustom=v.valores_custom||{}
           return(
             <div key={m.key} style={{...S.card,border:ea?'2px solid #2563eb':'1px solid #e5e7eb'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
                 <span style={{fontWeight:700,fontSize:15}}>{mlbl(m.year,m.month)}</span>
                 {ea&&<span style={{fontSize:11,background:'#dbeafe',color:'#2563eb',padding:'2px 8px',borderRadius:20,fontWeight:700}}>Actual</span>}
               </div>
@@ -1062,6 +1176,14 @@ export default function Dashboard(){
                   <input style={{width:105,padding:'6px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:14,textAlign:'right',background:'white'}} type="number" placeholder={f.ph} value={(v as any)[f.id]||''} onChange={e=>store.setVar(m.key,f.id,parseFloat(e.target.value)||0)}/>
                 </div>
               ))}
+              {customs.length>0&&<div style={{borderTop:'1px solid #e5e7eb',marginTop:7,paddingTop:7}}>
+                {customs.map((cv:any)=>(
+                  <div key={cv.id} style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
+                    <span style={{fontSize:13,color:'#475569',flex:1,fontWeight:500}}>📊 {cv.nombre} ({cv.unidad||'%'})</span>
+                    <input style={{width:105,padding:'6px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:14,textAlign:'right',background:'white'}} type="number" step="0.01" placeholder="0" value={valoresCustom[cv.id]||''} onChange={e=>store.setVarCustom(m.key,cv.id,parseFloat(e.target.value)||0)}/>
+                  </div>
+                ))}
+              </div>}
             </div>
           )
         })}
@@ -1193,7 +1315,6 @@ export default function Dashboard(){
       case 'grupos':return <RenderGrupos store={store} setModal={setModal}/>
       case 'expensas':return <RenderExpensas store={store} setModal={setModal}/>
       case 'owners':return <RenderOwners store={store} setModal={setModal}/>
-      case 'indices':return <RenderIndices store={store} setModal={setModal}/>
       case 'vars':return renderVars()
       case 'gastos':return renderGastos()
       case 'reporte':return renderReporte()
@@ -1211,7 +1332,7 @@ export default function Dashboard(){
     grupos:()=>setModal({type:'grupo',data:null}),
     expensas:()=>setModal({type:'expensa',data:null}),
     owners:()=>setModal({type:'owner',data:null}),
-    indices:()=>setModal({type:'indice',data:null}),
+    vars:()=>setModal({type:'indice',data:null}),
     gastos:()=>setModal({type:'gasto'}),
   }
 
@@ -1416,10 +1537,10 @@ export default function Dashboard(){
         onClose={()=>setModal(null)}
       />}
 
-      {modal?.type==='indice'&&<FormIndice
+      {modal?.type==='varCustom'&&<FormVarCustom
         ini={modal.data}
-        onSave={async(d:any)=>{if(modal.data)await store.updIndice(modal.data.id,d);else await store.addIndice(d)}}
-        onDelete={async()=>{if(modal.data)await store.delIndice(modal.data.id)}}
+        onSave={async(d:any)=>{if(modal.data)await store.updVarCustom(modal.data.id,d);else await store.addVarCustom(d)}}
+        onDelete={async()=>{if(modal.data)await store.delVarCustom(modal.data.id)}}
         onClose={()=>setModal(null)}
       />}
     </div>
@@ -2031,8 +2152,8 @@ function RenderIndices({store,setModal}:any){
   )
 }
 
-function FormIndice({ini,onSave,onDelete,onClose}:any){
-  const [d,setD]=useState(ini||{nombre:'',descripcion:'',valores:{}})
+:any){
+  const [d,setD]=useState(ini||{nombre:'',descripcion:'',tipo:'variable',frecuencia:'mensual',valor_fijo:'',valores:{}})
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const upVal=(mes:string,v:number)=>setD((p:any)=>({...p,valores:{...(p.valores||{}),[mes]:v}}))
   const delVal=(mes:string)=>setD((p:any)=>{const n={...(p.valores||{})};delete n[mes];return{...p,valores:n}})
@@ -2045,35 +2166,116 @@ function FormIndice({ini,onSave,onDelete,onClose}:any){
     setNVal('')
   }
 
-  const ok=d.nombre.trim()
+  const ok=d.nombre.trim()&&(d.tipo==='fijo'?d.valor_fijo:true)
   const meses=Object.keys(d.valores||{}).sort().reverse()
+
+  const handleSave=()=>{
+    if(!ok)return
+    const data:any={
+      nombre:d.nombre,
+      descripcion:d.descripcion||'',
+      tipo:d.tipo,
+      frecuencia:d.frecuencia,
+      valores:d.tipo==='variable'?(d.valores||{}):{},
+      valor_fijo:d.tipo==='fijo'?(parseFloat(d.valor_fijo)||0):0
+    }
+    onSave(data)
+    onClose()
+  }
 
   return(
     <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
       <div style={S.modalBox}>
         <div style={S.handle}/>
         <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar índice':'Nuevo índice'}</div>
-        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: ICL, IPC Tucumán" autoFocus/></div>
-        <div style={S.fg}><label style={S.lbl}>Descripción</label><input style={S.inp} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)}/></div>
-        <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Variación mensual (%)</p>
-        <div style={{display:'flex',gap:6,marginBottom:9}}>
-          <input style={{...S.inp,flex:1}} type="month" value={nMes} onChange={e=>setNMes(e.target.value)}/>
-          <input style={{...S.inp,width:90}} type="number" placeholder="%" value={nVal} onChange={e=>setNVal(e.target.value)}/>
-          <button onClick={addVal} style={{background:'#dbeafe',color:'#2563eb',padding:'0 12px',borderRadius:9,fontSize:13,fontWeight:700,border:'none',cursor:'pointer'}}>+</button>
+        
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: ICL, IPC propio, Aumento del consorcio" autoFocus/></div>
+        
+        <div style={S.fg}><label style={S.lbl}>Tipo de aumento</label>
+          <div style={{display:'flex',gap:6}}>
+            <button type="button" onClick={()=>up('tipo','variable')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.tipo==='variable'?'#2563eb':'#e5e7eb'}`,background:d.tipo==='variable'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.tipo==='variable'?'#2563eb':'#64748b',cursor:'pointer'}}>
+              📈 Variable<div style={{fontSize:10,fontWeight:500,marginTop:2}}>distinto cada mes</div>
+            </button>
+            <button type="button" onClick={()=>up('tipo','fijo')} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.tipo==='fijo'?'#2563eb':'#e5e7eb'}`,background:d.tipo==='fijo'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.tipo==='fijo'?'#2563eb':'#64748b',cursor:'pointer'}}>
+              🔒 Fijo<div style={{fontSize:10,fontWeight:500,marginTop:2}}>siempre el mismo %</div>
+            </button>
+          </div>
         </div>
-        {meses.length>0?<div style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:9,maxHeight:200,overflowY:'auto'}}>
-          {meses.map((m:string)=>(
-            <div key={m} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:'1px solid #e5e7eb'}}>
-              <span style={{fontSize:13,fontWeight:600}}>{m}</span>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:13,fontWeight:700}}>{d.valores[m]}%</span>
-                <button onClick={()=>delVal(m)} style={{background:'none',border:'none',color:'#dc2626',fontSize:16,cursor:'pointer',padding:'2px 6px'}}>×</button>
+
+        <div style={S.fg}><label style={S.lbl}>Frecuencia de aplicación</label>
+          <select style={S.sel} value={d.frecuencia||'mensual'} onChange={e=>up('frecuencia',e.target.value)}>
+            <option value="mensual">Mensual</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+
+        {d.tipo==='fijo'?<div style={S.fg}>
+          <label style={S.lbl}>Porcentaje de aumento (%)</label>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input style={{...S.inp,flex:1}} type="number" step="0.01" value={d.valor_fijo||''} onChange={e=>up('valor_fijo',e.target.value)} placeholder="Ej: 10"/>
+            <span style={{fontSize:18,fontWeight:700,color:'#475569'}}>%</span>
+          </div>
+          <div style={{padding:'8px 10px',borderRadius:8,fontSize:11,marginTop:6,background:'#dbeafe',color:'#1e3a8a'}}>Este % se aplicará cada vez que toque el ajuste según la frecuencia.</div>
+        </div>:<div>
+          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'10px 0 7px'}}>Variación mensual (%)</p>
+          <div style={{padding:'8px 10px',borderRadius:8,fontSize:11,marginBottom:8,background:'#dbeafe',color:'#1e3a8a'}}>Cargá el % de cada mes a medida que se publique.</div>
+          <div style={{display:'flex',gap:6,marginBottom:9}}>
+            <input style={{...S.inp,flex:1}} type="month" value={nMes} onChange={e=>setNMes(e.target.value)}/>
+            <input style={{...S.inp,width:90}} type="number" step="0.01" placeholder="%" value={nVal} onChange={e=>setNVal(e.target.value)}/>
+            <button type="button" onClick={addVal} style={{background:'#dbeafe',color:'#2563eb',padding:'0 14px',borderRadius:9,fontSize:14,fontWeight:700,border:'none',cursor:'pointer'}}>+</button>
+          </div>
+          {meses.length>0?<div style={{background:'#f3f4f6',borderRadius:9,padding:10,marginBottom:9,maxHeight:200,overflowY:'auto'}}>
+            {meses.map((m:string)=>(
+              <div key={m} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:'1px solid #e5e7eb'}}>
+                <span style={{fontSize:13,fontWeight:600}}>{m}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:13,fontWeight:700}}>{d.valores[m]}%</span>
+                  <button type="button" onClick={()=>delVal(m)} style={{background:'none',border:'none',color:'#dc2626',fontSize:16,cursor:'pointer',padding:'2px 6px'}}>×</button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>:<div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#fef3c7',color:'#78350f'}}>Todavía no cargaste valores. Agregá al menos uno.</div>}
-        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar índice</button>
+            ))}
+          </div>:<div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:9,background:'#fef3c7',color:'#78350f'}}>Sin valores aún. Podés guardar el índice y cargar valores más tarde.</div>}
+        </div>}
+
+        <div style={S.fg}><label style={S.lbl}>Descripción (opcional)</label><input style={S.inp} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)}/></div>
+        
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={handleSave}>Guardar índice</button>
         {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar</button>}
+        <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+
+function FormVarCustom({ini,onSave,onDelete,onClose}:any){
+  const [d,setD]=useState(ini||{nombre:'',descripcion:'',unidad:'%',tipo:'porcentaje'})
+  const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
+  const ok=d.nombre.trim()
+  return(
+    <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={S.modalBox}>
+        <div style={S.handle}/>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar variable':'Nueva variable'}</div>
+        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:11,background:'#dbeafe',color:'#1e3a8a'}}>
+          💡 Creá una variable propia (ej: Aumento del consorcio, ICL, Cuota mantenimiento). Después la cargás cada mes con su valor.
+        </div>
+        <div style={S.fg}><label style={S.lbl}>Nombre</label><input style={S.inp} value={d.nombre} onChange={e=>up('nombre',e.target.value)} placeholder="Ej: ICL, Aumento consorcio" autoFocus/></div>
+        <div style={S.fg}><label style={S.lbl}>Tipo de valor</label>
+          <div style={{display:'flex',gap:6}}>
+            <button type="button" onClick={()=>{up('tipo','porcentaje');up('unidad','%')}} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.tipo==='porcentaje'?'#2563eb':'#e5e7eb'}`,background:d.tipo==='porcentaje'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.tipo==='porcentaje'?'#2563eb':'#64748b',cursor:'pointer'}}>
+              📈 Porcentaje (%)<div style={{fontSize:10,fontWeight:500,marginTop:2}}>Variación mensual</div>
+            </button>
+            <button type="button" onClick={()=>{up('tipo','monto');up('unidad','$')}} style={{flex:1,padding:10,borderRadius:9,border:`1.5px solid ${d.tipo==='monto'?'#2563eb':'#e5e7eb'}`,background:d.tipo==='monto'?'#dbeafe':'white',fontSize:13,fontWeight:700,color:d.tipo==='monto'?'#2563eb':'#64748b',cursor:'pointer'}}>
+              💵 Monto ($)<div style={{fontSize:10,fontWeight:500,marginTop:2}}>Cotización</div>
+            </button>
+          </div>
+        </div>
+        <div style={S.fg}><label style={S.lbl}>Descripción (opcional)</label><input style={S.inp} value={d.descripcion||''} onChange={e=>up('descripcion',e.target.value)} placeholder="Ayuda a recordar para qué es"/></div>
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
+        {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar variable</button>}
         <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
       </div>
     </div>
