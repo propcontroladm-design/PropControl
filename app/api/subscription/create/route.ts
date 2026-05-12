@@ -6,7 +6,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { plan_id, mp_plan_id, email, user_id } = body
 
+    console.log('🔵 Subscription create requested:', { plan_id, mp_plan_id, email, user_id })
+
     if (!email || !user_id || !mp_plan_id) {
+      console.log('❌ Missing fields')
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
     }
 
@@ -23,44 +26,48 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://prop-control.vercel.app'
     const externalRef = `${user_id}_${plan_id}`
 
-    // Crear preapproval por API (no usar link directo)
-    // Esto asegura que MP dispare el webhook correctamente
+    const payload = {
+      preapproval_plan_id: mp_plan_id,
+      payer_email: email,
+      external_reference: externalRef,
+      back_url: `${appUrl}/exito`,
+      reason: `PropControl - Plan ${plan_id}`,
+    }
+
+    console.log('🔵 Calling MP API with payload:', payload)
+
     const mpResp = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        preapproval_plan_id: mp_plan_id,
-        payer_email: email,
-        external_reference: externalRef,
-        back_url: `${appUrl}/exito`,
-        notification_url: `${appUrl}/api/webhook`,
-        status: 'pending', // se vuelve "authorized" cuando paga
-      }),
+      body: JSON.stringify(payload),
     })
 
     const data = await mpResp.json()
 
+    console.log('🔵 MP response status:', mpResp.status)
+    console.log('🔵 MP response body:', JSON.stringify(data))
+
     if (!mpResp.ok) {
-      console.error('MP API error:', data)
-      // Si falla la API, fallback al link directo
-      const checkoutUrl = `https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=${mp_plan_id}&external_reference=${externalRef}`
-      return NextResponse.json({ init_point: checkoutUrl, fallback: true })
+      console.error('❌ MP API rejected:', data)
+      return NextResponse.json({ 
+        error: 'MP rechazó la solicitud',
+        mp_status: mpResp.status,
+        mp_error: data,
+      }, { status: 500 })
     }
 
-    // Guardar el preapproval_id en BD para tracking
     await supabase.from('usuarios').update({
       mp_subscription_id: data.id,
     }).eq('id', user_id)
 
-    console.log('Preapproval created:', data.id, 'for user', user_id)
+    console.log('✅ Preapproval created:', data.id, 'init_point:', data.init_point)
 
-    // init_point es el link al que tiene que ir el usuario
     return NextResponse.json({ init_point: data.init_point })
   } catch (e: any) {
-    console.error('Error:', e)
+    console.error('❌ Server error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
