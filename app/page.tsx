@@ -41,7 +41,9 @@ export default function Home() {
       {/* HERO */}
       <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f1f3d 0%,#1e3a8a 60%,#16a344 100%)',display:'flex',flexDirection:'column'}}>
         <nav style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'20px 40px',maxWidth:1200,margin:'0 auto',width:'100%'}}>
-          <span style={{color:'white',fontWeight:800,fontSize:24}}>Prop<span style={{color:'#4ade80'}}>Control</span></span>
+          <div style={{background:'white',padding:'8px 16px',borderRadius:12,display:'inline-block'}}>
+            <img src="/logo.svg" alt="PropControl" style={{height:48,display:'block'}}/>
+          </div>
           <button onClick={login} style={{background:'white',color:'#1e3a8a',padding:'10px 24px',borderRadius:8,fontWeight:700,fontSize:14,cursor:'pointer',border:'none'}}>Iniciar sesion</button>
         </nav>
         <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'40px 24px'}}>
@@ -161,7 +163,9 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer style={{background:'#0f1f3d',padding:'40px 24px',textAlign:'center'}}>
-        <span style={{color:'white',fontWeight:800,fontSize:20}}>Prop<span style={{color:'#4ade80'}}>Control</span></span>
+        <div style={{background:'white',padding:'10px 20px',borderRadius:12,display:'inline-block'}}>
+          <img src="/logo.svg" alt="PropControl" style={{height:42,display:'block'}}/>
+        </div>
         <div style={{marginTop:14,display:'flex',gap:24,justifyContent:'center',flexWrap:'wrap'}}>
           <a href="/terminos" style={{color:'rgba(255,255,255,0.7)',fontSize:13,textDecoration:'none'}}>Términos y Condiciones</a>
           <a href="/privacidad" style={{color:'rgba(255,255,255,0.7)',fontSize:13,textDecoration:'none'}}>Política de Privacidad</a>

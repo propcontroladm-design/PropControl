@@ -1375,12 +1375,8 @@ export default function Dashboard(){
     <div className="pc-layout">
       {/* SIDEBAR (desktop) */}
       <aside className="pc-sidebar">
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'4px 8px',marginBottom:18}}>
-          <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#2563eb,#16a344)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:18,boxShadow:'0 4px 10px rgba(37,99,235,.3)'}}>P</div>
-          <div>
-            <div style={{fontWeight:800,fontSize:16,color:'#1e3a8a',lineHeight:1}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
-            <div style={{fontSize:10,color:'#64748b',marginTop:2}}>v2.0</div>
-          </div>
+        <div style={{padding:'4px 0 12px',marginBottom:14,borderBottom:'1px solid #e5e7eb'}}>
+          <img src="/logo.svg" alt="PropControl" style={{width:'100%',maxWidth:200,height:'auto',display:'block'}}/>
         </div>
         
         {workspaces.length>0&&<div style={{marginBottom:14}}>
@@ -1422,10 +1418,7 @@ export default function Dashboard(){
       <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
         {/* MOBILE NAV */}
         <nav className="pc-mobile-nav" style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 12px',height:54,gap:8}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div style={{width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#2563eb,#16a344)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:14}}>P</div>
-            <div style={{fontWeight:800,fontSize:15,color:'#1e3a8a'}}>Prop<span style={{color:'#16a344'}}>Control</span></div>
-          </div>
+          <img src="/logo.svg" alt="PropControl" style={{height:36,display:'block'}}/>
           {workspaces.length>0&&<select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{flex:1,maxWidth:140,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:11,fontWeight:600,outline:'none'}}>
             {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}</option>)}
           </select>}
