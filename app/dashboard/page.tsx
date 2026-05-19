@@ -1341,76 +1341,117 @@ export default function Dashboard(){
   return(
     <>
     <style jsx global>{`
-      :root { --primary: #2563eb; --primary-dark: #1e3a8a; --success: #16a34a; --bg: #f8fafc; --surface: #ffffff; --border: #e5e7eb; --text: #0f172a; --text-muted: #64748b; }
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+      :root {
+        --primary: #22C55E;
+        --primary-dark: #16A34A;
+        --secondary: #2563EB;
+        --bg: #F8FAFC;
+        --surface: #FFFFFF;
+        --border: #E2E8F0;
+        --text: #0F172A;
+        --text-muted: #64748B;
+      }
       * { box-sizing: border-box; }
-      body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; -webkit-font-smoothing: antialiased; }
-      button { transition: all 0.15s ease; }
+      body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
+      button { transition: all 0.15s ease; font-family: 'Inter', sans-serif; }
       button:hover:not(:disabled) { transform: translateY(-1px); }
-      .card-hover { transition: all 0.2s ease; }
-      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08) !important; }
-      
-      /* Layout responsive */
+      input, select, textarea { font-family: 'Inter', sans-serif; }
+
+      .card-hover { transition: all 0.2s ease; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08) !important; border-color: #BBF7D0; }
+
+      /* Layout */
       .pc-layout { min-height: 100vh; background: var(--bg); }
       .pc-sidebar { display: none; }
       .pc-mobile-tabs { display: flex; }
       .pc-content-wrap { padding: 0; }
-      
+
       @media (min-width: 768px) {
         .pc-layout { display: flex; }
-        .pc-sidebar { display: flex; flex-direction: column; width: 220px; background: white; border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; padding: 16px 12px; flex-shrink: 0; overflow-y: auto; }
+        .pc-sidebar { display: flex; flex-direction: column; width: 210px; background: white; border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; padding: 14px 10px; flex-shrink: 0; overflow-y: auto; }
         .pc-mobile-tabs { display: none; }
         .pc-mobile-nav { display: none; }
-        .pc-content-wrap { flex: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+        .pc-content-wrap { flex: 1; max-width: 1180px; margin: 0 auto; padding: 0 28px; }
       }
-      
-      .pc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
-      @media (min-width: 640px) { .pc-grid-2 { grid-template-columns: repeat(2, 1fr); } }
-      @media (min-width: 1024px) { .pc-grid-2 { grid-template-columns: repeat(2, 1fr); } }
-      
+
+      .pc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 18px; }
+      @media (min-width: 640px) { .pc-grid-2 { grid-template-columns: repeat(2, 1fr); gap: 22px; } }
+
       .pc-grid-3 { display: grid; grid-template-columns: 1fr; gap: 12px; }
       @media (min-width: 640px) { .pc-grid-3 { grid-template-columns: repeat(2, 1fr); } }
       @media (min-width: 1024px) { .pc-grid-3 { grid-template-columns: repeat(3, 1fr); } }
+
+      /* Stats grid arriba de tabs */
+      .pc-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+      @media (min-width: 640px) { .pc-stats { grid-template-columns: repeat(4, 1fr); gap: 14px; } }
+
+      /* Sidebar items */
+      .pc-nav-item {
+        width: 100%; display: flex; align-items: center; gap: 10px;
+        padding: 9px 11px; margin-bottom: 2px; border-radius: 8px;
+        background: transparent; color: #475569; font-size: 13px; font-weight: 500;
+        border: none; cursor: pointer; text-align: left; transition: all 0.15s;
+        border-left: 3px solid transparent; padding-left: 11px;
+      }
+      .pc-nav-item:hover { background: #F1F5F9; color: var(--primary-dark); }
+      .pc-nav-item.active {
+        background: #F0FDF4; color: var(--primary-dark);
+        border-left-color: var(--primary); font-weight: 600;
+      }
+      .pc-nav-item.active .pc-nav-ico { color: var(--primary); }
+
+      /* Search elegante */
+      .pc-search {
+        width: 100%; padding: 11px 14px 11px 38px;
+        background: #F1F5F9; border: 1.5px solid transparent;
+        border-radius: 11px; font-size: 13.5px; outline: none;
+        transition: all 0.15s; font-family: 'Inter', sans-serif;
+      }
+      .pc-search:focus { background: white; border-color: #BBF7D0; box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
+
+      @keyframes pulse-ring {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .pulse { animation: pulse-ring 1.5s ease-in-out infinite; }
     `}</style>
     
     <div className="pc-layout">
       {/* SIDEBAR (desktop) */}
       <aside className="pc-sidebar">
-        <div style={{padding:'4px 0 12px',marginBottom:14,borderBottom:'1px solid #e5e7eb'}}>
-          <img src="/logo.svg" alt="PropControl" style={{width:'100%',maxWidth:200,height:'auto',display:'block'}}/>
+        <div style={{padding:'2px 4px 12px',marginBottom:12,borderBottom:'1px solid #E2E8F0'}}>
+          <img src="/logo.svg" alt="PropControl" style={{width:'100%',maxWidth:130,height:'auto',display:'block'}}/>
         </div>
         
-        {workspaces.length>0&&<div style={{marginBottom:14}}>
-          <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:1,marginBottom:5,padding:'0 8px'}}>Workspace</div>
-          <select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{width:'100%',padding:'8px 10px',border:'1.5px solid #e5e7eb',borderRadius:9,fontSize:12,fontWeight:600,outline:'none',background:'#f8fafc'}}>
+        {workspaces.length>0&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:9,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:1.2,marginBottom:5,padding:'0 4px'}}>Workspace</div>
+          <select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{width:'100%',padding:'7px 10px',border:'1.5px solid #E2E8F0',borderRadius:8,fontSize:12,fontWeight:600,outline:'none',background:'#F8FAFC',fontFamily:'Inter,sans-serif'}}>
             {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}{w.rol==='owner'?'':' 🤝'}</option>)}
           </select>
         </div>}
         
         <nav style={{flex:1,overflowY:'auto'}}>
           {TABS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:2,borderRadius:9,
-              background:tab===t.id?'#dbeafe':'transparent',color:tab===t.id?'#2563eb':'#475569',
-              fontSize:13,fontWeight:tab===t.id?700:500,border:'none',cursor:'pointer',textAlign:'left'
-            }}>
-              <span style={{fontSize:16,width:18,textAlign:'center'}}>{t.ico}</span>
+            <button key={t.id} onClick={()=>setTab(t.id)} className={'pc-nav-item'+(tab===t.id?' active':'')}>
+              <span className="pc-nav-ico" style={{fontSize:15,width:18,textAlign:'center'}}>{t.ico}</span>
               <span>{t.lbl}</span>
             </button>
           ))}
         </nav>
         
-        <div style={{borderTop:'1px solid #e5e7eb',paddingTop:10,marginTop:10}}>
-          {userData?.es_superadmin&&<div style={{display:'inline-block',background:'linear-gradient(135deg,#7c3aed,#a855f7)',color:'white',padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:700,marginBottom:8}}>✦ ADMIN</div>}
-          {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:600,marginBottom:8,textAlign:'center'}}>⏳ {diasTrial} días de trial</div>}
-          {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{width:'100%',background:userData?.suscripcion_estado==='activa'?'#dcfce7':'#16a34a',color:userData?.suscripcion_estado==='activa'?'#14532d':'white',padding:'8px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',cursor:'pointer',marginBottom:8}}>
+        <div style={{borderTop:'1px solid #E2E8F0',paddingTop:10,marginTop:10}}>
+          {userData?.es_superadmin&&<div style={{display:'inline-block',background:'#1E293B',color:'white',padding:'3px 10px',borderRadius:6,fontSize:10,fontWeight:700,marginBottom:8,letterSpacing:0.5}}>ADMIN</div>}
+          {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#FEF3C7',color:'#78350F',padding:'5px 10px',borderRadius:7,fontSize:11,fontWeight:600,marginBottom:8,textAlign:'center'}}>⏳ {diasTrial} días de trial</div>}
+          {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{width:'100%',background:userData?.suscripcion_estado==='activa'?'#DCFCE7':'#22C55E',color:userData?.suscripcion_estado==='activa'?'#14532D':'white',padding:'8px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',cursor:'pointer',marginBottom:8,fontFamily:'Inter,sans-serif'}}>
             {userData?.suscripcion_estado==='activa'?'✓ Plan activo':'Suscribirse'}
           </button>}
-          <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px',borderRadius:8,background:'#f8fafc'}}>
-            <div style={{width:30,height:30,borderRadius:'50%',background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,flexShrink:0}}>{ini}</div>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px',borderRadius:8,background:'#F8FAFC'}}>
+            <div style={{width:28,height:28,borderRadius:'50%',background:'#22C55E',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:12,flexShrink:0}}>{ini}</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:11,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user?.email}</div>
+              <div style={{fontSize:11,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user?.email}</div>
             </div>
-            <button onClick={logout} title="Cerrar sesión" style={{background:'none',border:'none',color:'#64748b',fontSize:14,cursor:'pointer',padding:4}}>↪</button>
+            <button onClick={logout} title="Cerrar sesión" style={{background:'none',border:'none',color:'#64748B',fontSize:14,cursor:'pointer',padding:4}}>↪</button>
           </div>
         </div>
       </aside>
@@ -1423,12 +1464,12 @@ export default function Dashboard(){
             {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}</option>)}
           </select>}
           <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
-            {userData?.es_superadmin&&<div style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)',color:'white',padding:'3px 8px',borderRadius:20,fontSize:10,fontWeight:700}}>ADMIN</div>}
-            {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#fef3c7',color:'#78350f',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>{diasTrial}d</div>}
-            {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{background:'#16a344',color:'white',padding:'5px 10px',borderRadius:8,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>
-              {userData?.suscripcion_estado==='activa'?'Plan':'Plan'}
+            {userData?.es_superadmin&&<div style={{background:'#1E293B',color:'white',padding:'3px 8px',borderRadius:6,fontSize:10,fontWeight:700,letterSpacing:0.5}}>ADMIN</div>}
+            {!userData?.es_superadmin&&userData?.suscripcion_estado==='trial'&&<div style={{background:'#FEF3C7',color:'#78350F',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>{diasTrial}d</div>}
+            {!userData?.es_superadmin&&<button onClick={()=>router.push('/planes')} style={{background:'#22C55E',color:'white',padding:'5px 10px',borderRadius:7,fontSize:11,fontWeight:700,border:'none',cursor:'pointer'}}>
+              Plan
             </button>}
-            <button onClick={logout} style={{width:30,height:30,borderRadius:'50%',background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>{ini}</button>
+            <button onClick={logout} style={{width:30,height:30,borderRadius:'50%',background:'#22C55E',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>{ini}</button>
           </div>
         </nav>
 
@@ -1448,7 +1489,7 @@ export default function Dashboard(){
       </div>
 
       {/* FAB */}
-      {FAB_ACTIONS[tab]&&<button onClick={FAB_ACTIONS[tab]} style={{position:'fixed',bottom:24,right:24,width:56,height:56,background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',borderRadius:28,fontSize:26,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(37,99,235,.4)',zIndex:150,border:'none',cursor:'pointer',fontWeight:300}}>+</button>}
+      {FAB_ACTIONS[tab]&&tab!=='props'&&<button onClick={FAB_ACTIONS[tab]} style={{position:'fixed',bottom:24,right:24,width:54,height:54,background:'#22C55E',color:'white',borderRadius:27,fontSize:26,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 6px 16px rgba(34,197,94,0.35)',zIndex:150,border:'none',cursor:'pointer',fontWeight:300}}>+</button>}
 
       {/* MODALES */}
       {modal?.type==='pago'&&<ModalPago
