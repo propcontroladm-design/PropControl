@@ -7,9 +7,8 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text()
     const body = JSON.parse(rawBody)
     
-    console.log('MP Webhook received:', JSON.stringify(body))
+    console.log('🔔 MP Webhook received:', JSON.stringify(body))
 
-    // Verificar firma HMAC si tenemos secret configurado
     const secret = process.env.MP_WEBHOOK_SECRET
     if (secret) {
       const xSignature = request.headers.get('x-signature')
@@ -30,43 +29,43 @@ export async function POST(request: NextRequest) {
         const hmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
         
         if (hmac !== v1) {
-          console.error('Invalid signature')
+          console.error('❌ Invalid signature')
           return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
       }
     }
 
-    // Solo procesamos preapproval (suscripciones)
-    if (body.type !== 'preapproval' && body.topic !== 'preapproval') {
-      console.log('Skipping non-preapproval event:', body.type || body.topic)
+    const type = body.type || body.topic || body.action || ''
+    const entity = body.entity || ''
+    
+    const isPreapproval = type.includes('preapproval') || 
+                          type.includes('subscription') || 
+                          entity === 'preapproval' ||
+                          body.topic === 'preapproval'
+    
+    if (!isPreapproval) {
+      console.log('⏭️ Skipping non-preapproval event:', type, entity)
       return NextResponse.json({ ok: true })
     }
 
     const preapprovalId = body.data?.id || body.id
     if (!preapprovalId) {
-      console.log('No preapproval ID')
+      console.log('⚠️ No preapproval ID found')
       return NextResponse.json({ ok: true })
     }
 
-    // Consultar estado en MP
+    console.log('🔍 Fetching preapproval from MP:', preapprovalId)
+
     const accessToken = process.env.MP_ACCESS_TOKEN
     const mpResp = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     const sub = await mpResp.json()
     
-    console.log('MP subscription data:', JSON.stringify(sub))
+    console.log('📦 MP subscription data:', JSON.stringify(sub))
 
     if (!mpResp.ok) {
-      console.error('MP fetch error:', sub)
-      return NextResponse.json({ ok: true })
-    }
-
-    const ref = sub.external_reference || ''
-    const [user_id, plan_id] = ref.split('_')
-
-    if (!user_id) {
-      console.log('No user_id in external_reference:', ref)
+      console.error('❌ MP fetch error:', sub)
       return NextResponse.json({ ok: true })
     }
 
@@ -75,33 +74,62 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    let estado = 'pendiente'
-    if (sub.status === 'authorized') estado = 'activa'
-    else if (sub.status === 'paused') estado = 'pausada'
-    else if (sub.status === 'cancelled') estado = 'cancelada'
+    const ref = sub.external_reference || ''
+    const [user_id, plan_id] = ref.split('_')
 
-    const updateData: any = {
-      suscripcion_estado: estado,
-      mp_subscription_id: preapprovalId,
-      mp_plan_id: plan_id,
-    }
-    
-    if (estado === 'activa') {
-      updateData.suscripcion_fin = new Date(Date.now() + 35 * 86400000).toISOString()
+    if (user_id) {
+      await updateUser(supabase, user_id, plan_id, preapprovalId, sub)
+      return NextResponse.json({ ok: true })
     }
 
-    const { error } = await supabase.from('usuarios').update(updateData).eq('id', user_id)
+    // Fallback: buscar por email
+    console.log('⚠️ No user_id in external_reference. Trying email fallback:', sub.payer_email)
     
-    if (error) {
-      console.error('Supabase update error:', error)
-    } else {
-      console.log(`Updated user ${user_id} to ${estado}`)
+    if (sub.payer_email) {
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('id, mp_plan_id')
+        .eq('email', sub.payer_email)
+        .single()
+      
+      if (usuario) {
+        console.log('✅ Found user by email:', usuario.id)
+        await updateUser(supabase, usuario.id, usuario.mp_plan_id || 'starter', preapprovalId, sub)
+      } else {
+        console.log('❌ User not found by email:', sub.payer_email)
+      }
     }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
-    console.error('Webhook error:', e)
+    console.error('❌ Webhook error:', e)
     return NextResponse.json({ ok: false, error: e.message }, { status: 200 })
+  }
+}
+
+async function updateUser(supabase: any, user_id: string, plan_id: string, preapprovalId: string, sub: any) {
+  let estado = 'pendiente'
+  if (sub.status === 'authorized') estado = 'activa'
+  else if (sub.status === 'paused') estado = 'pausada'
+  else if (sub.status === 'cancelled') estado = 'cancelada'
+
+  const updateData: any = {
+    suscripcion_estado: estado,
+    mp_subscription_id: preapprovalId,
+    mp_plan_id: plan_id,
+  }
+  
+  if (estado === 'activa') {
+    updateData.suscripcion_fin = new Date(Date.now() + 35 * 86400000).toISOString()
+    updateData.suscripcion_inicio = new Date().toISOString()
+  }
+
+  const { error } = await supabase.from('usuarios').update(updateData).eq('id', user_id)
+  
+  if (error) {
+    console.error('❌ Supabase update error:', error)
+  } else {
+    console.log(`✅ Updated user ${user_id} to ${estado}`)
   }
 }
 

@@ -6,10 +6,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { plan_id, mp_plan_id, email, user_id } = body
 
-    console.log('🔵 Subscription create requested:', { plan_id, mp_plan_id, email, user_id })
+    console.log('🔵 Subscription create:', { plan_id, mp_plan_id, email, user_id })
 
     if (!email || !user_id || !mp_plan_id) {
-      console.log('❌ Missing fields')
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
     }
 
@@ -26,46 +25,14 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://prop-control.vercel.app'
     const externalRef = `${user_id}_${plan_id}`
 
-    const payload = {
-      preapproval_plan_id: mp_plan_id,
-      payer_email: email,
-      external_reference: externalRef,
-      back_url: `${appUrl}/exito`,
-      reason: `PropControl - Plan ${plan_id}`,
-    }
+    // Construir checkout URL con external_reference
+    // El external_reference SE PROPAGA al preapproval cuando el usuario completa el pago
+    // Esto SÍ dispara el webhook configurado en MP
+    const checkoutUrl = `https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=${mp_plan_id}&external_reference=${encodeURIComponent(externalRef)}`
 
-    console.log('🔵 Calling MP API with payload:', payload)
+    console.log('✅ Returning checkout URL with external_reference:', checkoutUrl)
 
-    const mpResp = await fetch('https://api.mercadopago.com/preapproval', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-
-    const data = await mpResp.json()
-
-    console.log('🔵 MP response status:', mpResp.status)
-    console.log('🔵 MP response body:', JSON.stringify(data))
-
-    if (!mpResp.ok) {
-      console.error('❌ MP API rejected:', data)
-      return NextResponse.json({ 
-        error: 'MP rechazó la solicitud',
-        mp_status: mpResp.status,
-        mp_error: data,
-      }, { status: 500 })
-    }
-
-    await supabase.from('usuarios').update({
-      mp_subscription_id: data.id,
-    }).eq('id', user_id)
-
-    console.log('✅ Preapproval created:', data.id, 'init_point:', data.init_point)
-
-    return NextResponse.json({ init_point: data.init_point })
+    return NextResponse.json({ init_point: checkoutUrl })
   } catch (e: any) {
     console.error('❌ Server error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
