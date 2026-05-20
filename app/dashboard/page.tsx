@@ -288,19 +288,37 @@ function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel}:an
 function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
   const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0,propietarios:[],imagen_url:''})
   const [uploadingImg,setUploadingImg]=useState(false)
+  const [uploadError,setUploadError]=useState('')
   
   async function uploadImage(file:File){
     if(!file)return
     if(file.size>2*1024*1024){alert('La imagen es muy grande (máx 2MB)');return}
     setUploadingImg(true)
+    setUploadError('')
     try{
-      const ext=file.name.split('.').pop()
+      const ext=(file.name.split('.').pop()||'jpg').toLowerCase()
       const fileName=`${Date.now()}-${Math.random().toString(36).slice(2,9)}.${ext}`
-      const {data,error}=await sb.storage.from('propiedades').upload(fileName,file)
-      if(error){alert('Error subiendo imagen: '+error.message);console.error(error);return}
+      console.log('🔵 Subiendo:',fileName,'tamaño:',file.size,'tipo:',file.type)
+      const {data,error}=await sb.storage.from('propiedades').upload(fileName,file,{contentType:file.type,upsert:false})
+      if(error){
+        console.error('❌ Error storage:',error)
+        setUploadError('Error: '+error.message)
+        alert('Error subiendo imagen:\n\n'+error.message+'\n\nReintenta o revisá los permisos del bucket en Supabase.')
+        return
+      }
+      console.log('✅ Subido:',data)
       const {data:urlData}=sb.storage.from('propiedades').getPublicUrl(fileName)
+      console.log('🔗 URL pública:',urlData.publicUrl)
+      if(!urlData.publicUrl){
+        setUploadError('No se pudo obtener la URL pública')
+        return
+      }
       setD((p:any)=>({...p,imagen_url:urlData.publicUrl}))
-    }catch(e:any){alert('Error: '+e.message)}finally{setUploadingImg(false)}
+    }catch(e:any){
+      console.error('❌ Excepción:',e)
+      setUploadError(e.message)
+      alert('Error: '+e.message)
+    }finally{setUploadingImg(false)}
   }
   
   function removeImage(){
@@ -317,6 +335,7 @@ function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
         {/* IMAGEN */}
         <div style={{marginBottom:14}}>
           <label style={S.lbl}>Foto de la propiedad (opcional)</label>
+          {uploadError&&<div style={{padding:'8px 12px',borderRadius:8,fontSize:12,marginBottom:8,background:'#FEE2E2',color:'#991B1B',fontWeight:600}}>⚠️ {uploadError}</div>}
           {d.imagen_url?(
             <div style={{position:'relative',borderRadius:11,overflow:'hidden',border:'1.5px solid #E2E8F0'}}>
               <img src={d.imagen_url} alt="" style={{width:'100%',height:140,objectFit:'cover',display:'block'}}/>
