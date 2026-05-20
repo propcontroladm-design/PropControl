@@ -126,8 +126,17 @@ function useAppData(workspaceId:string, userId:string){
 
   const ws={workspace_id:workspaceId, usuario_id:userId}
 
-  async function addProp(d:any){const{data}=await sb.from('propiedades').insert({...d,...ws}).select().single();if(data)setProps(p=>[...p,data]);return data}
-  async function updProp(id:string,d:any){await sb.from('propiedades').update(d).eq('id',id);setProps(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function addProp(d:any){
+    const{data,error}=await sb.from('propiedades').insert({...d,...ws}).select().single()
+    if(error){console.error('❌ addProp:',error);alert('Error guardando propiedad:\n'+error.message);throw error}
+    if(data)setProps(p=>[...p,data])
+    return data
+  }
+  async function updProp(id:string,d:any){
+    const{error}=await sb.from('propiedades').update(d).eq('id',id)
+    if(error){console.error('❌ updProp:',error);alert('Error actualizando:\n'+error.message);throw error}
+    setProps(p=>p.map(x=>x.id===id?{...x,...d}:x))
+  }
   async function delProp(id:string){await sb.from('propiedades').delete().eq('id',id);setProps(p=>p.filter(x=>x.id!==id))}
   async function addInq(d:any){const{data}=await sb.from('inquilinos').insert({...d,...ws}).select().single();if(data)setInqs(p=>[...p,data]);return data}
   async function updInq(id:string,d:any){await sb.from('inquilinos').update(d).eq('id',id);setInqs(p=>p.map(x=>x.id===id?{...x,...d}:x))}
@@ -430,7 +439,28 @@ function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
           })}
         </div>}
         <div style={S.fg}><label style={S.lbl}>Observaciones</label><textarea style={{...S.inp,resize:'none'}} rows={2} value={d.observaciones} onChange={e=>up('observaciones',e.target.value)}/></div>
-        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={()=>{if(ok){onSave(d);onClose()}}}>Guardar</button>
+        <button style={{...S.btnP,opacity:ok?1:.5}} disabled={!ok} onClick={async()=>{
+          if(!ok)return
+          // Sanitizar: solo enviar campos válidos
+          const cleanData={
+            codigo:d.codigo,nombre:d.nombre,direccion:d.direccion||'',ciudad:d.ciudad||'',
+            tipo:d.tipo,superficie:d.superficie?parseFloat(d.superficie):null,
+            observaciones:d.observaciones||'',activo:d.activo!==false,
+            grupo_id:d.grupo_id||null,
+            valor_compra:parseFloat(d.valor_compra)||0,
+            pct_expensas:parseFloat(d.pct_expensas)||0,
+            propietarios:d.propietarios||[],
+            imagen_url:d.imagen_url||null
+          }
+          console.log('💾 Guardando propiedad:',cleanData)
+          try{
+            await onSave(cleanData)
+            onClose()
+          }catch(e:any){
+            console.error('❌ Error guardando:',e)
+            alert('Error al guardar: '+(e.message||e))
+          }
+        }}>Guardar</button>
         {ini&&<button style={S.btnD} onClick={()=>{onDelete();onClose()}}>Eliminar propiedad</button>}
         <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cancelar</button>
       </div>
@@ -1410,33 +1440,21 @@ export default function Dashboard(){
       }
       * { box-sizing: border-box; }
       body { 
-        background: linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 50%, #EFF6FF 100%);
-        background-attachment: fixed;
+        background: #F8FAFC;
         color: var(--text);
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         -webkit-font-smoothing: antialiased;
         letter-spacing: -0.01em;
+        margin: 0;
+      }
+      .pc-layout {
+        min-height: 100vh !important;
+        background:
+          radial-gradient(at top right, rgba(34,197,94,0.15) 0%, transparent 50%),
+          radial-gradient(at bottom left, rgba(37,99,235,0.12) 0%, transparent 50%),
+          linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 50%, #EFF6FF 100%) !important;
         position: relative;
       }
-      body::before {
-        content: '';
-        position: fixed;
-        top: -100px; right: -100px;
-        width: 400px; height: 400px;
-        background: radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%);
-        pointer-events: none;
-        z-index: 0;
-      }
-      body::after {
-        content: '';
-        position: fixed;
-        bottom: -150px; left: -150px;
-        width: 500px; height: 500px;
-        background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
-        pointer-events: none;
-        z-index: 0;
-      }
-      .pc-layout { position: relative; z-index: 1; }
       button { transition: all 0.15s ease; font-family: 'Inter', sans-serif; }
       button:hover:not(:disabled) { transform: translateY(-1px); }
       input, select, textarea { font-family: 'Inter', sans-serif; }
