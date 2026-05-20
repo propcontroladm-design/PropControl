@@ -102,7 +102,7 @@ function useAppData(workspaceId:string, userId:string){
     if(!workspaceId)return
     setLoading(true)
     const [p,i,c,pg,g,gr,ow,ix,ex,vc]=await Promise.all([
-      sb.from('propiedades').select('*').eq('workspace_id',workspaceId),
+      sb.from('propiedades').select('*').eq('workspace_id',workspaceId).order('codigo'),
       sb.from('inquilinos').select('*').eq('workspace_id',workspaceId),
       sb.from('contratos').select('*').eq('workspace_id',workspaceId),
       sb.from('pagos').select('*').eq('workspace_id',workspaceId),
@@ -1439,21 +1439,21 @@ export default function Dashboard(){
         --text-muted: #64748B;
       }
       * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; min-height: 100vh; }
       body { 
-        background: #F8FAFC;
+        background:
+          radial-gradient(circle at 0% 0%, rgba(34,197,94,0.18) 0%, transparent 35%),
+          radial-gradient(circle at 100% 100%, rgba(37,99,235,0.15) 0%, transparent 40%),
+          linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 30%, #FFFFFF 60%, #DBEAFE 100%) !important;
+        background-attachment: fixed !important;
         color: var(--text);
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         -webkit-font-smoothing: antialiased;
         letter-spacing: -0.01em;
-        margin: 0;
       }
       .pc-layout {
         min-height: 100vh !important;
-        background:
-          radial-gradient(at top right, rgba(34,197,94,0.15) 0%, transparent 50%),
-          radial-gradient(at bottom left, rgba(37,99,235,0.12) 0%, transparent 50%),
-          linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 50%, #EFF6FF 100%) !important;
-        position: relative;
+        background: transparent !important;
       }
       button { transition: all 0.15s ease; font-family: 'Inter', sans-serif; }
       button:hover:not(:disabled) { transform: translateY(-1px); }
