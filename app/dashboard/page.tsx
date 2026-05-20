@@ -286,7 +286,26 @@ function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel}:an
 
 // ─── FORM PROPIEDAD ───────────────────────────
 function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
-  const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0,propietarios:[]})
+  const [d,setD]=useState(ini||{codigo:'',nombre:'',direccion:'',ciudad:'Yerba Buena',tipo:'local',superficie:'',observaciones:'',activo:true,grupo_id:'',valor_compra:0,pct_expensas:0,propietarios:[],imagen_url:''})
+  const [uploadingImg,setUploadingImg]=useState(false)
+  
+  async function uploadImage(file:File){
+    if(!file)return
+    if(file.size>2*1024*1024){alert('La imagen es muy grande (máx 2MB)');return}
+    setUploadingImg(true)
+    try{
+      const ext=file.name.split('.').pop()
+      const fileName=`${Date.now()}-${Math.random().toString(36).slice(2,9)}.${ext}`
+      const {data,error}=await sb.storage.from('propiedades').upload(fileName,file)
+      if(error){alert('Error subiendo imagen: '+error.message);console.error(error);return}
+      const {data:urlData}=sb.storage.from('propiedades').getPublicUrl(fileName)
+      setD((p:any)=>({...p,imagen_url:urlData.publicUrl}))
+    }catch(e:any){alert('Error: '+e.message)}finally{setUploadingImg(false)}
+  }
+  
+  function removeImage(){
+    setD((p:any)=>({...p,imagen_url:''}))
+  }
   const up=(f:string,v:any)=>setD((p:any)=>({...p,[f]:v}))
   const ok=d.nombre.trim()
   return(
@@ -294,6 +313,24 @@ function FormProp({ini,grupos,owners,propsList,onSave,onDelete,onClose}:any){
       <div style={S.modalBox}>
         <div style={S.handle}/>
         <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>{ini?'Editar propiedad':'Nueva propiedad'}</div>
+        
+        {/* IMAGEN */}
+        <div style={{marginBottom:14}}>
+          <label style={S.lbl}>Foto de la propiedad (opcional)</label>
+          {d.imagen_url?(
+            <div style={{position:'relative',borderRadius:11,overflow:'hidden',border:'1.5px solid #E2E8F0'}}>
+              <img src={d.imagen_url} alt="" style={{width:'100%',height:140,objectFit:'cover',display:'block'}}/>
+              <button type="button" onClick={removeImage} style={{position:'absolute',top:8,right:8,background:'rgba(239,68,68,0.95)',color:'white',border:'none',borderRadius:8,padding:'5px 11px',fontSize:11,fontWeight:700,cursor:'pointer',boxShadow:'0 2px 6px rgba(0,0,0,0.2)'}}>✕ Quitar</button>
+            </div>
+          ):(
+            <label style={{display:'block',padding:'18px',border:'2px dashed #CBD5E1',borderRadius:11,textAlign:'center',cursor:uploadingImg?'wait':'pointer',background:'#F8FAFC',transition:'all 0.15s'}} onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='#22C55E';(e.currentTarget as HTMLElement).style.background='#F0FDF4'}} onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#CBD5E1';(e.currentTarget as HTMLElement).style.background='#F8FAFC'}}>
+              <input type="file" accept="image/*" disabled={uploadingImg} onChange={e=>{const f=e.target.files?.[0];if(f)uploadImage(f)}} style={{display:'none'}}/>
+              <div style={{fontSize:24,marginBottom:5,opacity:0.5}}>📷</div>
+              <div style={{fontSize:13,color:'#475569',fontWeight:600}}>{uploadingImg?'Subiendo...':'Subir foto'}</div>
+              <div style={{fontSize:11,color:'#94A3B8',marginTop:3}}>JPG, PNG o WebP · Máx 2MB</div>
+            </label>
+          )}
+        </div>
         <div style={{display:'flex',gap:9,marginBottom:11}}>
           <div style={{flex:1}}><label style={S.lbl}>Código</label><input style={S.inp} value={d.codigo} onChange={e=>up('codigo',e.target.value)} placeholder="HL01"/></div>
           <div style={{flex:1}}><label style={S.lbl}>Tipo</label>
@@ -1353,13 +1390,15 @@ export default function Dashboard(){
         --text-muted: #64748B;
       }
       * { box-sizing: border-box; }
-      body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
+      body { background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%); background-attachment: fixed; color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
       button { transition: all 0.15s ease; font-family: 'Inter', sans-serif; }
       button:hover:not(:disabled) { transform: translateY(-1px); }
       input, select, textarea { font-family: 'Inter', sans-serif; }
 
-      .card-hover { transition: all 0.2s ease; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08) !important; border-color: #BBF7D0; }
+      .card-hover { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+      .card-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(34,197,94,0.12) !important; border-color: #4ADE80; }
+      .card-img { transition: transform 0.4s cubic-bezier(0.4,0,0.2,1); }
+      .card-hover:hover .card-img { transform: scale(1.04); }
 
       /* Layout */
       .pc-layout { min-height: 100vh; background: var(--bg); }
@@ -1397,7 +1436,9 @@ export default function Dashboard(){
       .pc-nav-item:hover { background: #F1F5F9; color: var(--primary-dark); }
       .pc-nav-item.active {
         background: #F0FDF4; color: var(--primary-dark);
-        border-left-color: var(--primary); font-weight: 600;
+        border-left: 4px solid var(--primary); font-weight: 600;
+        padding-left: 10px;
+        box-shadow: 0 1px 2px rgba(34,197,94,0.08);
       }
       .pc-nav-item.active .pc-nav-ico { color: var(--primary); }
 
@@ -1420,8 +1461,9 @@ export default function Dashboard(){
     <div className="pc-layout">
       {/* SIDEBAR (desktop) */}
       <aside className="pc-sidebar">
-        <div style={{padding:'2px 4px 12px',marginBottom:12,borderBottom:'1px solid #E2E8F0'}}>
-          <img src="/logo.svg" alt="PropControl" style={{width:'100%',maxWidth:130,height:'auto',display:'block'}}/>
+        <div style={{display:'flex',alignItems:'center',gap:9,padding:'4px 6px 14px',marginBottom:12,borderBottom:'1px solid #E2E8F0'}}>
+          <img src="/logo-icon.svg" alt="" style={{width:36,height:36,display:'block',flexShrink:0}}/>
+          <span style={{fontWeight:700,fontSize:17,color:'#0F172A',letterSpacing:'-0.5px'}}>Prop<span style={{color:'#22C55E'}}>Control</span></span>
         </div>
         
         {workspaces.length>0&&<div style={{marginBottom:12}}>
@@ -1459,7 +1501,10 @@ export default function Dashboard(){
       <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
         {/* MOBILE NAV */}
         <nav className="pc-mobile-nav" style={{background:'white',borderBottom:'1px solid #e5e7eb',position:'sticky',top:0,zIndex:100,display:'flex',alignItems:'center',padding:'0 12px',height:54,gap:8}}>
-          <img src="/logo.svg" alt="PropControl" style={{height:36,display:'block'}}/>
+          <div style={{display:'flex',alignItems:'center',gap:7}}>
+            <img src="/logo-icon.svg" alt="" style={{width:30,height:30}}/>
+            <span style={{fontWeight:700,fontSize:15,color:'#0F172A',letterSpacing:'-0.4px'}}>Prop<span style={{color:'#22C55E'}}>Control</span></span>
+          </div>
           {workspaces.length>0&&<select value={currentWs?.id||''} onChange={e=>{const w=workspaces.find((x:any)=>x.id===e.target.value);if(w)setCurrentWs(w)}} style={{flex:1,maxWidth:140,padding:'5px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:11,fontWeight:600,outline:'none'}}>
             {workspaces.map((w:any)=><option key={w.id} value={w.id}>{w.nombre}</option>)}
           </select>}
