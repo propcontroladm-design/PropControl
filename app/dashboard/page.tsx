@@ -1390,7 +1390,34 @@ export default function Dashboard(){
         --text-muted: #64748B;
       }
       * { box-sizing: border-box; }
-      body { background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%); background-attachment: fixed; color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
+      body { 
+        background: linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 50%, #EFF6FF 100%);
+        background-attachment: fixed;
+        color: var(--text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: -0.01em;
+        position: relative;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        top: -100px; right: -100px;
+        width: 400px; height: 400px;
+        background: radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      body::after {
+        content: '';
+        position: fixed;
+        bottom: -150px; left: -150px;
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .pc-layout { position: relative; z-index: 1; }
       button { transition: all 0.15s ease; font-family: 'Inter', sans-serif; }
       button:hover:not(:disabled) { transform: translateY(-1px); }
       input, select, textarea { font-family: 'Inter', sans-serif; }
@@ -1408,7 +1435,7 @@ export default function Dashboard(){
 
       @media (min-width: 768px) {
         .pc-layout { display: flex; }
-        .pc-sidebar { display: flex; flex-direction: column; width: 210px; background: white; border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; padding: 14px 10px; flex-shrink: 0; overflow-y: auto; }
+        .pc-sidebar { display: flex; flex-direction: column; width: 210px; background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; padding: 14px 10px; flex-shrink: 0; overflow-y: auto; }
         .pc-mobile-tabs { display: none; }
         .pc-mobile-nav { display: none; }
         .pc-content-wrap { flex: 1; max-width: 1180px; margin: 0 auto; padding: 0 28px; }
