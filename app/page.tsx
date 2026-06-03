@@ -1118,7 +1118,7 @@ export default function Dashboard(){
           <div style={{fontSize:15,fontWeight:600,color:'#111827',marginBottom:4}}>Sin contratos activos</div>
           <div style={{fontSize:13}}>Andá a Contratos para crear uno</div>
         </div>}
-        {rows.map(({c,mObj,lista,total,diff,estado,espP,inq})=>{
+        {rows.map(({c,mObj,lista,total,diff,estado,espP,inq,mesesDebidos}:any)=>{
           const waN=inq?(inq.es_sociedad&&inq.contacto_pagos?inq.contacto_pagos:inq.nombre):''
           const waT=inq?(inq.es_sociedad&&inq.tel_contacto?inq.tel_contacto:inq.telefono):''
           const waM=waT?`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}. Monto: ${mObj?fmtN(mObj.monto,mObj.moneda):'—'}. Gracias!`:''
