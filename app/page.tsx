@@ -2278,7 +2278,7 @@ function RenderOwners({store,setModal}:any){
         <div style={{fontSize:13}}>Tocá + para agregar uno</div>
       </div>}
       {owners.map((o:any)=>{
-        const propsDelOwner=props.filter((p:any)=>(p.propietarios||[]).some((x:any)=>x.owner_id===o.id))
+        const propsDelOwner=props.filter((p:any)=>(p.propietarios||[]).some((x:any)=>x.propietario_id===o.id||x.owner_id===o.id))
         return(
           <div key={o.id} style={S.card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
@@ -2293,11 +2293,11 @@ function RenderOwners({store,setModal}:any){
             </div>
             {propsDelOwner.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #e5e7eb'}}>
               {propsDelOwner.map((p:any)=>{
-                const asig=(p.propietarios||[]).find((x:any)=>x.owner_id===o.id)
+                const asig=(p.propietarios||[]).find((x:any)=>x.propietario_id===o.id||x.owner_id===o.id)
                 return(
                   <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}}>
                     <span>• {p.codigo} {p.nombre}</span>
-                    <span style={{fontWeight:600,color:'#6b7280'}}>{asig?.pct||0}%</span>
+                    <span style={{fontWeight:600,color:'#6b7280'}}>{asig?.porcentaje||asig?.pct||0}%</span>
                   </div>
                 )
               })}
