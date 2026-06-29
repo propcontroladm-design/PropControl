@@ -141,8 +141,8 @@ function useAppData(workspaceId:string, userId:string){
   async function addInq(d:any){const{data}=await sb.from('inquilinos').insert({...d,...ws}).select().single();if(data)setInqs(p=>[...p,data]);return data}
   async function updInq(id:string,d:any){await sb.from('inquilinos').update(d).eq('id',id);setInqs(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delInq(id:string){await sb.from('inquilinos').delete().eq('id',id);setInqs(p=>p.filter(x=>x.id!==id))}
-  async function addContrato(d:any){const{data}=await sb.from('contratos').insert({...d,...ws}).select().single();if(data)setContratos(p=>[...p,data]);return data}
-  async function updContrato(id:string,d:any){await sb.from('contratos').update(d).eq('id',id);setContratos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function addContrato(d:any){const{data,error}=await sb.from('contratos').insert({...d,...ws}).select().single();if(error){console.error('❌ addContrato:',error);alert('Error guardando contrato:\n'+error.message);throw error}if(data)setContratos(p=>[...p,data]);return data}
+  async function updContrato(id:string,d:any){const{error}=await sb.from('contratos').update(d).eq('id',id);if(error){console.error('❌ updContrato:',error);alert('Error actualizando contrato:\n'+error.message);throw error}setContratos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delContrato(id:string){await sb.from('contratos').delete().eq('id',id);setContratos(p=>p.filter(x=>x.id!==id))}
   async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,...ws}).select().single();if(data)setPagos(p=>[...p,data]);return data}
   async function delPago(id:string){await sb.from('pagos').delete().eq('id',id);setPagos(p=>p.filter(x=>x.id!==id))}
@@ -698,6 +698,11 @@ function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
           <div style={{flex:1}}><label style={S.lbl}>📅 Inicio</label><input style={S.inp} type="date" value={d.fecha_inicio} onChange={e=>up('fecha_inicio',e.target.value)}/></div>
           <div style={{flex:1}}><label style={S.lbl}>📅 Vencimiento</label><input style={S.inp} type="date" value={d.fecha_fin||''} onChange={e=>up('fecha_fin',e.target.value)}/></div>
         </div>
+        <div style={S.fg}>
+          <label style={S.lbl}>📅 Controlar pagos desde (opcional)</label>
+          <input style={S.inp} type="date" value={d.fecha_control_desde||''} onChange={e=>up('fecha_control_desde',e.target.value)}/>
+          <div style={{fontSize:11,color:'#64748b',marginTop:4}}>Si el contrato es antiguo, indicá desde qué mes empezar a controlar pagos</div>
+        </div>
 
         <div style={S.fg}><label style={S.lbl}>Modo de contrato</label>
           <div style={{display:'flex',gap:6}}>
@@ -968,6 +973,22 @@ export default function Dashboard(){
   if(authLoading)return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#f9fafb'}}>
       <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:12}}>⏳</div><p style={{color:'#6b7280'}}>Cargando...</p></div>
+    </div>
+  )
+
+  // Bloqueo trial vencido (superadmins no se bloquean)
+  const esSuperadmin=userData?.email==='propcontroladm@gmail.com'||userData?.email==='claritadibacco@gmail.com'
+  const estadoSus=userData?.suscripcion_estado
+  const trialVencido=!esSuperadmin&&diasTrial<=0&&(estadoSus==='trial'||estadoSus==='vencida'||estadoSus==='cancelada'||!estadoSus)
+  if(trialVencido&&userData)return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'linear-gradient(135deg,#ECFDF5,#DBEAFE)',padding:20,fontFamily:'Inter,-apple-system,sans-serif'}}>
+      <div style={{background:'white',borderRadius:20,padding:'40px 32px',maxWidth:460,width:'100%',textAlign:'center',boxShadow:'0 20px 60px rgba(0,0,0,0.12)'}}>
+        <div style={{fontSize:52,marginBottom:16}}>⏰</div>
+        <h2 style={{fontSize:22,fontWeight:800,color:'#0f172a',marginBottom:8}}>Tu período de prueba terminó</h2>
+        <p style={{fontSize:14,color:'#64748b',marginBottom:24,lineHeight:1.6}}>Gracias por probar PropControl. Para seguir usando todas las funciones, elegí un plan que se adapte a tu negocio.</p>
+        <a href="/planes" style={{display:'block',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'white',padding:'14px 24px',borderRadius:12,fontSize:15,fontWeight:700,textDecoration:'none',marginBottom:10}}>Ver planes y precios →</a>
+        <button onClick={logout} style={{background:'none',border:'none',color:'#94a3b8',fontSize:13,cursor:'pointer',padding:'8px 0'}}>Cerrar sesión</button>
+      </div>
     </div>
   )
 
@@ -1465,7 +1486,7 @@ export default function Dashboard(){
       .card-hover:hover .card-img { transform: scale(1.04); }
 
       /* Layout */
-      .pc-layout { min-height: 100vh; background: var(--bg); }
+      .pc-layout { min-height: 100vh; background: transparent; }
       .pc-sidebar { display: none; }
       .pc-mobile-tabs { display: flex; }
       .pc-content-wrap { padding: 0; }
@@ -1633,7 +1654,7 @@ export default function Dashboard(){
       {modal?.type==='contrato'&&<FormContrato
         ini={modal.data} props={props} inqs={inqs}
         onSave={async(d:any)=>{
-          const payload={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino,contrato:{...d}}
+          const payload={propiedad_id:d.propiedad_id,propiedades_ids:d.propiedades_ids||([d.propiedad_id].filter(Boolean)),inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,fecha_fin:d.fecha_fin||null,fecha_control_desde:d.fecha_control_desde||null,activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino}
           if(modal.data)await store.updContrato(modal.data.id,payload)
           else await store.addContrato(payload)
         }}
