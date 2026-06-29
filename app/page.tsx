@@ -141,8 +141,8 @@ function useAppData(workspaceId:string, userId:string){
   async function addInq(d:any){const{data}=await sb.from('inquilinos').insert({...d,...ws}).select().single();if(data)setInqs(p=>[...p,data]);return data}
   async function updInq(id:string,d:any){await sb.from('inquilinos').update(d).eq('id',id);setInqs(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delInq(id:string){await sb.from('inquilinos').delete().eq('id',id);setInqs(p=>p.filter(x=>x.id!==id))}
-  async function addContrato(d:any){const{data}=await sb.from('contratos').insert({...d,...ws}).select().single();if(data)setContratos(p=>[...p,data]);return data}
-  async function updContrato(id:string,d:any){await sb.from('contratos').update(d).eq('id',id);setContratos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function addContrato(d:any){const{data,error}=await sb.from('contratos').insert({...d,...ws}).select().single();if(error){console.error('❌ addContrato:',error);alert('Error guardando contrato:\n'+error.message);throw error}if(data)setContratos(p=>[...p,data]);return data}
+  async function updContrato(id:string,d:any){const{error}=await sb.from('contratos').update(d).eq('id',id);if(error){console.error('❌ updContrato:',error);alert('Error actualizando contrato:\n'+error.message);throw error}setContratos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function delContrato(id:string){await sb.from('contratos').delete().eq('id',id);setContratos(p=>p.filter(x=>x.id!==id))}
   async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,...ws}).select().single();if(data)setPagos(p=>[...p,data]);return data}
   async function delPago(id:string){await sb.from('pagos').delete().eq('id',id);setPagos(p=>p.filter(x=>x.id!==id))}
@@ -1716,7 +1716,7 @@ export default function Dashboard(){
       {modal?.type==='contrato'&&<FormContrato
         ini={modal.data} props={props} inqs={inqs}
         onSave={async(d:any)=>{
-          const payload:any={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,fecha_fin:d.fecha_fin||null,fecha_control_desde:d.fecha_control_desde||null,propiedades_ids:d.propiedades_ids||[],activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino,contrato:{...d}}
+          const payload:any={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,fecha_fin:d.fecha_fin||null,fecha_control_desde:d.fecha_control_desde||null,propiedades_ids:d.propiedades_ids||[],activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino}
           if(modal.data)await store.updContrato(modal.data.id,payload)
           else await store.addContrato(payload)
         }}
