@@ -640,8 +640,9 @@ function FormInq({ini,onSave,onDelete,onClose}:any){
 
 // ─── FORM CONTRATO ────────────────────────────
 function FormContrato({ini,props,inqs,onSave,onDelete,onClose}:any){
-  const hasConceptos = ini?.contrato?.conceptos?.length > 0
-  const [modo,setModo]=useState<'simple'|'multi'>(hasConceptos?'multi':(ini?'simple':'simple'))
+  const hasConceptos = (ini?.conceptos?.length||0) > 0
+  const hasEscalonado = !hasConceptos && ini?.tipo === 'escalonado'
+  const [modo,setModo]=useState<'simple'|'multi'>(hasConceptos?'multi':'simple')
   const [d,setD]=useState(ini||{
     propiedad_id:'',propiedades_ids:[],inquilino_id:'',
     fecha_inicio:new Date().toISOString().slice(0,10),fecha_fin:'',fecha_control_desde:'',
