@@ -150,14 +150,21 @@ function useAppData(workspaceId:string, userId:string){
   async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,...ws}).select().single();if(data)setPagos(p=>[...p,data]);return data}
   async function delPago(id:string){await sb.from('pagos').delete().eq('id',id);setPagos(p=>p.filter(x=>x.id!==id))}
   async function updPago(id:string,d:any){const{error}=await sb.from('pagos').update(d).eq('id',id);if(!error)setPagos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
+  async function upsertVar(payload:any){
+    const{error}=await sb.from('variables').upsert({...ws,...payload},{onConflict:'workspace_id,periodo'})
+    if(error){
+      const{error:e2}=await sb.from('variables').upsert({...ws,...payload},{onConflict:'usuario_id,periodo'})
+      if(e2)console.error('❌ upsertVar:',e2.message)
+    }
+  }
   async function setVar(periodo:string,field:string,val:number){
-    await sb.from('variables').upsert({...ws,periodo,[field]:val},{onConflict:'workspace_id,periodo'})
+    await upsertVar({periodo,[field]:val})
     setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),[field]:val}}))
   }
   async function setVarCustom(periodo:string,customId:string,val:number){
     const current=vars[periodo]?.valores_custom||{}
     const nuevo={...current,[customId]:val}
-    await sb.from('variables').upsert({...ws,periodo,valores_custom:nuevo},{onConflict:'workspace_id,periodo'})
+    await upsertVar({periodo,valores_custom:nuevo})
     setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),valores_custom:nuevo}}))
   }
   async function addVarCustom(d:any){
