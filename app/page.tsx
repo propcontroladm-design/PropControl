@@ -1065,14 +1065,11 @@ export default function Dashboard(){
           setAuthLoading(false)
           window.history.replaceState(null,'','/dashboard')
         } else {
+          setAuthLoading(false)
           sb.auth.onAuthStateChange(async(event, session) => {
             if(session){
               setUser(session.user)
               await loadUserAndWorkspaces(session.user.id)
-              setAuthLoading(false)
-              window.history.replaceState(null,'','/dashboard')
-            } else {
-              router.push('/')
             }
           })
         }
