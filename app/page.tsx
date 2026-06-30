@@ -19,9 +19,12 @@ function toP(mo:any,vm:any){if(!mo)return 0;const m=mo.monto||0;if(mo.moneda==='
 function waURL(t:string,m:string){return 'https://wa.me/'+t.replace(/\D/g,'')+'?text='+encodeURIComponent(m)}
 
 function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
-  if(!alq?.contrato)return null
-  const c=alq.contrato,mesK=mk(y,m),vm=(vars&&vars[mesK])||{}
-  const ini=new Date((alq.fecha_inicio||'2025-01-01')+'T00:00:00')
+  if(!alq)return null
+  // Soporta tanto calcM(contrato,...) como calcM({contrato},...) (legacy)
+  const c=alq.contrato||alq
+  if(!c)return null
+  const mesK=mk(y,m),vm=(vars&&vars[mesK])||{}
+  const ini=new Date((c.fecha_inicio||'2025-01-01')+'T00:00:00')
   const mr=(y-ini.getFullYear())*12+(m-ini.getMonth())+1
   function debeAj(fr:string){if(!fr||fr==='mensual')return true;if(fr==='trimestral')return (mr-1)%3===0;if(fr==='semestral')return (mr-1)%6===0;if(fr==='anual')return (mr-1)%12===0;return true}
   function calcEscalonado(tramos:any[]){
