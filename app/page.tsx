@@ -1117,6 +1117,20 @@ export default function Dashboard(){
     </div>
   )
 
+  if(!user)return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 30%,#fff 60%,#dbeafe 100%)'}}>
+      <div style={{background:'white',borderRadius:20,padding:'40px 32px',maxWidth:400,width:'100%',textAlign:'center',boxShadow:'0 8px 40px rgba(0,0,0,0.10)'}}>
+        <div style={{fontSize:44,marginBottom:8}}>🏠</div>
+        <div style={{fontWeight:900,fontSize:26,color:'#1e3a8a',marginBottom:4}}>Prop<span style={{color:'#16a34a'}}>Control</span></div>
+        <p style={{color:'#6b7280',fontSize:14,marginBottom:28}}>Gestión de propiedades y alquileres</p>
+        <button onClick={()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/auth/callback'}})} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'white',border:'2px solid #e5e7eb',borderRadius:12,padding:'13px 20px',fontSize:15,fontWeight:700,color:'#111827',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8 20-20 0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.7-2.9-11.3-7.1l-6.6 4.8C9.8 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.8l6.2 5.2C40.8 35.8 44 30.3 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+          Ingresar con Google
+        </button>
+      </div>
+    </div>
+  )
+
   // ── TAB INICIO ──────────────────────────────
   const renderInicio=()=>{
     // Mes que se está visualizando (puede ser pasado, presente o futuro)
