@@ -358,7 +358,7 @@ function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel,onU
             </div>
           </div>}
           <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 7px'}}>Agregar pago</p>
-          {mObj&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>Esperado: {fmtN(mObj.monto,mObj.moneda)}{mObj.iva?' (IVA 21%)':''}</div>}
+          {mObj&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>Esperado: {fmtN(mObj.monto,mObj.moneda)}{mObj.moneda!=='pesos'&&espP>0?` · ${fmtN(espP,'pesos')}`:''}{mObj.iva?' (IVA 21%)':''}</div>}
           <div style={S.fg}>
             <label style={S.lbl}>Monto</label>
             <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
@@ -1265,7 +1265,7 @@ export default function Dashboard(){
               </div>
               <div style={{display:'flex',gap:5,marginBottom:9}}>
                 {[
-                  {l:'Esperado',v:mObj?fmtN(mObj.monto,mObj.moneda):'—',c:'#111827'},
+                  {l:'Esperado',v:mObj?(mObj.moneda!=='pesos'?`${fmtN(mObj.monto,mObj.moneda)} · ${fmtN(espP,'pesos')}`:fmtN(mObj.monto,'pesos')):'—',c:'#111827'},
                   {l:'Pagado',v:fmtN(total,'pesos'),c:total===0?'#dc2626':total>=espP?'#16a34a':'#d97706'},
                   {l:'Diferencia',v:diff===0?'±0':(diff>0?'+':'')+fmtN(Math.abs(diff),'pesos'),c:diff>=0?'#16a34a':'#dc2626'},
                 ].map((a,i)=>(
