@@ -146,6 +146,7 @@ function useAppData(workspaceId:string, userId:string){
   async function delContrato(id:string){await sb.from('contratos').delete().eq('id',id);setContratos(p=>p.filter(x=>x.id!==id))}
   async function addPago(d:any){const{data}=await sb.from('pagos').insert({...d,...ws}).select().single();if(data)setPagos(p=>[...p,data]);return data}
   async function delPago(id:string){await sb.from('pagos').delete().eq('id',id);setPagos(p=>p.filter(x=>x.id!==id))}
+  async function updPago(id:string,d:any){const{error}=await sb.from('pagos').update(d).eq('id',id);if(!error)setPagos(p=>p.map(x=>x.id===id?{...x,...d}:x))}
   async function setVar(periodo:string,field:string,val:number){
     await sb.from('variables').upsert({...ws,periodo,[field]:val},{onConflict:'workspace_id,periodo'})
     setVars((v:any)=>({...v,[periodo]:{...(v[periodo]||{}),[field]:val}}))
@@ -200,7 +201,7 @@ function useAppData(workspaceId:string, userId:string){
 
   return{props,inqs,contratos,pagos,vars,gastos,grupos,owners,indices,varsCustom,expensas,loading,
     addProp,updProp,delProp,addInq,updInq,delInq,addContrato,updContrato,delContrato,
-    addPago,delPago,setVar,setVarCustom,addVarCustom,updVarCustom,delVarCustom,
+    addPago,delPago,updPago,setVar,setVarCustom,addVarCustom,updVarCustom,delVarCustom,
     addGasto,delGasto,addGrupo,updGrupo,delGrupo,
     addOwner,updOwner,delOwner,addExpensa,updExpensa,delExpensa,
     addIndice,updIndice,delIndice,bulkImport,reload:loadAll}
@@ -230,63 +231,190 @@ function Badge({e}:{e:string}){
 }
 
 // ─── MODAL PAGO ───────────────────────────────
-function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel}:any){
+function ModalPago({contrato,mes,mObj,vm,lista,inqNombre,onClose,onAdd,onDel,onUpd}:any){
+  const [tab,setTab]=useState<'pago'|'historico'>('pago')
   const [monto,setMonto]=useState('')
   const [moneda,setMoneda]=useState(mObj?.moneda||'pesos')
   const [tipo,setTipo]=useState('transferencia')
   const [det,setDet]=useState('')
+  const [fecha,setFecha]=useState(new Date().toISOString().slice(0,10))
+  // edit pago existente
+  const [editId,setEditId]=useState<string|null>(null)
+  const [editMonto,setEditMonto]=useState('')
+  const [editMoneda,setEditMoneda]=useState('pesos')
+  const [editTipo,setEditTipo]=useState('transferencia')
+  const [editDet,setEditDet]=useState('')
+  const [editFecha,setEditFecha]=useState('')
+  // historico
+  const [hDesde,setHDesde]=useState(mk(mes.year,mes.month))
+  const [hHasta,setHHasta]=useState(mk(mes.year,mes.month))
+  const [hMonto,setHMonto]=useState('')
+  const [hMoneda,setHMoneda]=useState(mObj?.moneda||'pesos')
+  const [hTipo,setHTipo]=useState('transferencia')
+  const [hDet,setHDet]=useState('')
+
   const espP=toP(mObj,vm)
   const totP=lista.reduce((s:number,p:any)=>s+(p.monto_pesos||0),0)
   const n=parseFloat(monto)||0
   const mp=moneda==='pesos'?n:moneda==='dolar'?n*(vm?.dolar||0):n*(vm?.nafta||0)
 
+  function startEdit(pg:any){
+    setEditId(pg.id);setEditMonto(String(pg.monto));setEditMoneda(pg.moneda||'pesos')
+    setEditTipo(pg.tipo_pago||'transferencia');setEditDet(pg.detalle||'');setEditFecha(pg.fecha||new Date().toISOString().slice(0,10))
+  }
+  function saveEdit(){
+    if(!editId)return
+    const em=parseFloat(editMonto)||0
+    const emp=editMoneda==='pesos'?em:editMoneda==='dolar'?em*(vm?.dolar||0):em*(vm?.nafta||0)
+    onUpd(editId,{monto:em,moneda:editMoneda,monto_pesos:emp,tipo_pago:editTipo,detalle:editDet,fecha:editFecha})
+    setEditId(null)
+  }
+
+  function registrarHistorico(){
+    const total=parseFloat(hMonto)||0
+    if(!total)return
+    // Generar lista de meses entre hDesde y hHasta
+    const [dy,dm]=hDesde.split('-').map(Number)
+    const [hy,hm]=hHasta.split('-').map(Number)
+    const meses:string[]=[]
+    let y=dy,m=dm
+    while(y<hy||(y===hy&&m<=hm)){meses.push(mk(y,m-1));if(m===12){y++;m=1}else m++}
+    if(!meses.length)return
+    const porMes=Math.round(total/meses.length)
+    const mp2=hMoneda==='pesos'?porMes:hMoneda==='dolar'?porMes*(vm?.dolar||0):porMes*(vm?.nafta||0)
+    meses.forEach((periodo,i)=>{
+      onAdd({monto:porMes,moneda:hMoneda,monto_pesos:mp2,tipo_pago:hTipo,detalle:hDet||(meses.length>1?`Pago histórico ${i+1}/${meses.length}`:''),fecha:hDesde+'-01',periodo_override:periodo})
+    })
+    setHMonto('');setHDet('')
+  }
+
+  const tipoBtn=(t:string,cur:string,set:(v:string)=>void)=>(
+    <button key={t} onClick={()=>set(t)} style={{flex:1,padding:'8px 4px',borderRadius:9,border:`1.5px solid ${cur===t?'#2563eb':'#e5e7eb'}`,background:cur===t?'#dbeafe':'white',fontSize:12,fontWeight:700,color:cur===t?'#2563eb':'#6b7280',cursor:'pointer'}}>
+      {t==='transferencia'?'🏦 Transf.':t==='cheque'?'📋 Cheque':'💵 Efectivo'}
+    </button>
+  )
+
   return(
     <div style={S.modal} onClick={(e:any)=>{if(e.target===e.currentTarget)onClose()}}>
       <div style={S.modalBox}>
         <div style={S.handle}/>
-        <div style={{fontSize:17,fontWeight:800,marginBottom:13}}>Registrar Pago</div>
-        <div style={{marginBottom:9}}>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:8}}>Registrar Pago</div>
+        <div style={{marginBottom:11}}>
           <span style={{display:'inline-block',background:'#f3f4f6',color:'#6b7280',padding:'2px 7px',borderRadius:20,fontSize:12,marginRight:4}}>{mlbl(mes.year,mes.month)}</span>
           <span style={{display:'inline-block',background:'#f3f4f6',color:'#6b7280',padding:'2px 7px',borderRadius:20,fontSize:12,marginRight:4}}>{contrato.nombre_propiedad||''}</span>
           {inqNombre&&<span style={{display:'inline-block',background:'#f3f4f6',color:'#6b7280',padding:'2px 7px',borderRadius:20,fontSize:12}}>{inqNombre}</span>}
         </div>
-        {lista.length>0&&<div>
-          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Pagos del período</p>
-          {lista.map((pg:any)=>(
-            <div key={pg.id} style={{background:'#f3f4f6',borderRadius:8,padding:'8px 10px',marginBottom:5,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:700}}>{fmtN(pg.monto,pg.moneda)}{pg.moneda!=='pesos'&&` ≈ ${fmtN(pg.monto_pesos,'pesos')}`}</div>
-                <div style={{fontSize:11,color:'#6b7280',marginTop:1}}>{pg.tipo_pago==='efectivo'?'💵':pg.tipo_pago==='cheque'?'📋':'🏦'} {pg.tipo_pago||''}{pg.detalle?' · '+pg.detalle:''} · {pg.fecha}</div>
+
+        {/* Tabs */}
+        <div style={{display:'flex',gap:6,marginBottom:14}}>
+          {([['pago','💳 Pago del mes'],['historico','📦 Pago histórico']] as [string,string][]).map(([k,lbl])=>(
+            <button key={k} onClick={()=>setTab(k as any)} style={{flex:1,padding:'8px',borderRadius:9,border:`1.5px solid ${tab===k?'#2563eb':'#e5e7eb'}`,background:tab===k?'#dbeafe':'white',fontSize:12,fontWeight:700,color:tab===k?'#2563eb':'#6b7280',cursor:'pointer'}}>{lbl}</button>
+          ))}
+        </div>
+
+        {tab==='pago'&&<>
+          {/* Pagos existentes */}
+          {lista.length>0&&<div>
+            <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 7px'}}>Pagos del período</p>
+            {lista.map((pg:any)=>(
+              <div key={pg.id}>
+                {editId===pg.id?(
+                  <div style={{background:'#eff6ff',borderRadius:8,padding:'10px',marginBottom:5,border:'1.5px solid #2563eb'}}>
+                    <div style={{display:'flex',gap:6,marginBottom:7}}>
+                      <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:8,overflow:'hidden',flex:1}}>
+                        <select style={{border:'none',background:'#f3f4f6',padding:'7px 6px',fontSize:12,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',color:'#111827'}} value={editMoneda} onChange={e=>setEditMoneda(e.target.value)}>
+                          <option value="pesos">$</option><option value="dolar">U$D</option><option value="nafta">L</option>
+                        </select>
+                        <input style={{flex:1,border:'none',padding:'7px 9px',fontSize:14,outline:'none',background:'white',minWidth:0}} type="number" value={editMonto} onChange={e=>setEditMonto(e.target.value)} autoFocus/>
+                      </div>
+                      <input style={{...S.inp,flex:1,padding:'7px 9px',fontSize:13}} type="date" value={editFecha} onChange={e=>setEditFecha(e.target.value)}/>
+                    </div>
+                    <div style={{display:'flex',gap:5,marginBottom:7}}>{['transferencia','cheque','efectivo'].map(t=>tipoBtn(t,editTipo,setEditTipo))}</div>
+                    <input style={{...S.inp,marginBottom:7}} placeholder="Detalle" value={editDet} onChange={e=>setEditDet(e.target.value)}/>
+                    <div style={{display:'flex',gap:6}}>
+                      <button onClick={saveEdit} style={{...S.btnP,flex:1,padding:'8px',fontSize:13}}>Guardar</button>
+                      <button onClick={()=>setEditId(null)} style={{...S.btnS,flex:1,padding:'8px',fontSize:13}}>Cancelar</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{background:'#f3f4f6',borderRadius:8,padding:'8px 10px',marginBottom:5,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700}}>{fmtN(pg.monto,pg.moneda)}{pg.moneda!=='pesos'&&` ≈ ${fmtN(pg.monto_pesos,'pesos')}`}</div>
+                      <div style={{fontSize:11,color:'#6b7280',marginTop:1}}>{pg.tipo_pago==='efectivo'?'💵':pg.tipo_pago==='cheque'?'📋':'🏦'} {pg.tipo_pago||''}{pg.detalle?' · '+pg.detalle:''} · {pg.fecha}</div>
+                    </div>
+                    <div style={{display:'flex',gap:4}}>
+                      <button onClick={()=>startEdit(pg)} style={{background:'none',border:'none',color:'#2563eb',fontSize:15,padding:'2px 6px',cursor:'pointer',lineHeight:1}}>✏️</button>
+                      <button onClick={()=>onDel(pg.id)} style={{background:'none',border:'none',color:'#dc2626',fontSize:18,padding:'2px 6px',cursor:'pointer',lineHeight:1}}>×</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button onClick={()=>onDel(pg.id)} style={{background:'none',border:'none',color:'#dc2626',fontSize:18,padding:'2px 6px',cursor:'pointer',lineHeight:1}}>×</button>
+            ))}
+            <div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:totP>=espP?'#dcfce7':'#fef3c7',color:totP>=espP?'#14532d':'#78350f'}}>
+              {totP>=espP?`✓ Cubierto: ${fmtN(totP,'pesos')}`:`Pagado: ${fmtN(totP,'pesos')} | Falta: ${fmtN(Math.max(0,espP-totP),'pesos')}`}
             </div>
-          ))}
-          <div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:totP>=espP?'#dcfce7':'#fef3c7',color:totP>=espP?'#14532d':'#78350f'}}>
-            {totP>=espP?`✓ Cubierto: ${fmtN(totP,'pesos')}`:`Pagado: ${fmtN(totP,'pesos')} | Falta: ${fmtN(Math.max(0,espP-totP),'pesos')}`}
+          </div>}
+          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 7px'}}>Agregar pago</p>
+          {mObj&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>Esperado: {fmtN(mObj.monto,mObj.moneda)}{mObj.iva?' (IVA 21%)':''}</div>}
+          <div style={S.fg}>
+            <label style={S.lbl}>Monto</label>
+            <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
+              <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={moneda} onChange={e=>setMoneda(e.target.value)}>
+                <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
+              </select>
+              <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" placeholder="0" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus/>
+            </div>
           </div>
-        </div>}
-        <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Agregar pago</p>
-        {mObj&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>Esperado: {fmtN(mObj.monto,mObj.moneda)}{mObj.iva?' (IVA 21%)':''}</div>}
-        <div style={S.fg}>
-          <label style={S.lbl}>Monto</label>
-          <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
-            <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={moneda} onChange={e=>setMoneda(e.target.value)}>
-              <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
-            </select>
-            <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" placeholder="0" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus/>
+          {moneda!=='pesos'&&mp>0&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>≈ {fmtN(mp,'pesos')}</div>}
+          <div style={S.fg}>
+            <label style={S.lbl}>Fecha</label>
+            <input style={S.inp} type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
           </div>
-        </div>
-        {moneda!=='pesos'&&mp>0&&<div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>≈ {fmtN(mp,'pesos')}</div>}
-        <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'14px 0 7px'}}>Forma de pago</p>
-        <div style={{display:'flex',gap:6,marginBottom:9}}>
-          {['transferencia','cheque','efectivo'].map(t=>(
-            <button key={t} onClick={()=>setTipo(t)} style={{flex:1,padding:'8px 4px',borderRadius:9,border:`1.5px solid ${tipo===t?'#2563eb':'#e5e7eb'}`,background:tipo===t?'#dbeafe':'white',fontSize:12,fontWeight:700,color:tipo===t?'#2563eb':'#6b7280',cursor:'pointer'}}>
-              {t==='transferencia'?'🏦 Transf.':t==='cheque'?'📋 Cheque':'💵 Efectivo'}
-            </button>
-          ))}
-        </div>
-        {(tipo==='transferencia'||tipo==='cheque')&&<div style={S.fg}><label style={S.lbl}>{tipo==='cheque'?'N° cheque y banco':'Destinatario'}</label><input style={S.inp} value={det} onChange={e=>setDet(e.target.value)}/></div>}
-        <button style={S.btnP} onClick={()=>{if(n>0){onAdd({monto:n,moneda,monto_pesos:mp,tipo_pago:tipo,detalle:det,fecha:new Date().toISOString().slice(0,10)});setMonto('');setDet('')}}}>+ Agregar pago</button>
+          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 7px'}}>Forma de pago</p>
+          <div style={{display:'flex',gap:6,marginBottom:9}}>{['transferencia','cheque','efectivo'].map(t=>tipoBtn(t,tipo,setTipo))}</div>
+          {(tipo==='transferencia'||tipo==='cheque')&&<div style={S.fg}><label style={S.lbl}>{tipo==='cheque'?'N° cheque y banco':'Destinatario'}</label><input style={S.inp} value={det} onChange={e=>setDet(e.target.value)}/></div>}
+          <button style={S.btnP} onClick={()=>{if(n>0){onAdd({monto:n,moneda,monto_pesos:mp,tipo_pago:tipo,detalle:det,fecha});setMonto('');setDet('')}}}>+ Agregar pago</button>
+        </>}
+
+        {tab==='historico'&&<>
+          <div style={{background:'#fef9c3',border:'1px solid #fde68a',borderRadius:9,padding:'10px 12px',fontSize:12,color:'#78350f',marginBottom:12}}>
+            Registrá un total cobrado en un rango de meses. El monto se divide en partes iguales entre los meses seleccionados.
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:9}}>
+            <div style={S.fg}>
+              <label style={S.lbl}>Desde (mes)</label>
+              <input style={S.inp} type="month" value={hDesde} onChange={e=>setHDesde(e.target.value)}/>
+            </div>
+            <div style={S.fg}>
+              <label style={S.lbl}>Hasta (mes)</label>
+              <input style={S.inp} type="month" value={hHasta} onChange={e=>setHHasta(e.target.value)}/>
+            </div>
+          </div>
+          <div style={S.fg}>
+            <label style={S.lbl}>Monto total cobrado</label>
+            <div style={{display:'flex',border:'1.5px solid #e5e7eb',borderRadius:10,overflow:'hidden'}}>
+              <select style={{border:'none',background:'#f3f4f6',padding:'9px 8px',fontSize:13,fontWeight:700,outline:'none',borderRight:'1px solid #e5e7eb',minWidth:72,color:'#111827'}} value={hMoneda} onChange={e=>setHMoneda(e.target.value)}>
+                <option value="pesos">$ Pesos</option><option value="dolar">U$D</option><option value="nafta">L Nafta</option>
+              </select>
+              <input style={{flex:1,border:'none',padding:'9px 11px',fontSize:15,outline:'none',background:'white',minWidth:0}} type="number" placeholder="0" value={hMonto} onChange={e=>setHMonto(e.target.value)} autoFocus/>
+            </div>
+          </div>
+          {(()=>{
+            const total=parseFloat(hMonto)||0
+            if(!total||!hDesde||!hHasta)return null
+            const [dy,dm]=hDesde.split('-').map(Number)
+            const [hy,hm]=hHasta.split('-').map(Number)
+            let cnt=0,y=dy,m=dm
+            while(y<hy||(y===hy&&m<=hm)){cnt++;if(m===12){y++;m=1}else m++}
+            if(cnt<=0)return null
+            return <div style={{padding:'9px 11px',borderRadius:9,fontSize:13,marginBottom:9,background:'#dbeafe',color:'#1e3a8a'}}>{cnt} mes{cnt>1?'es':''} · {fmtN(Math.round(total/cnt),hMoneda)} por mes</div>
+          })()}
+          <p style={{fontSize:11,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:.7,margin:'0 0 7px'}}>Forma de pago</p>
+          <div style={{display:'flex',gap:6,marginBottom:9}}>{['transferencia','cheque','efectivo'].map(t=>tipoBtn(t,hTipo,setHTipo))}</div>
+          <div style={S.fg}><label style={S.lbl}>Detalle (opcional)</label><input style={S.inp} value={hDet} onChange={e=>setHDet(e.target.value)}/></div>
+          <button style={S.btnP} onClick={registrarHistorico}>📦 Registrar pago histórico</button>
+        </>}
+
         <button style={{...S.btnS,marginTop:7}} onClick={onClose}>Cerrar</button>
       </div>
     </div>
@@ -1690,12 +1818,18 @@ export default function Dashboard(){
         inqNombre={(()=>{const inq=inqs.find(i=>i.id===modal.contrato.inquilino_id);return inq?inq.nombre:''})()}
         onClose={()=>setModal(null)}
         onAdd={async(pg:any)=>{
-          const data=await store.addPago({...pg,contrato_id:modal.contrato.id,periodo:modal.mes.key})
+          const periodo=pg.periodo_override||modal.mes.key
+          const {periodo_override,...pgClean}=pg
+          const data=await store.addPago({...pgClean,contrato_id:modal.contrato.id,periodo})
           if(data)setModal((m:any)=>m?{...m,lista:[...m.lista,data]}:m)
         }}
         onDel={async(id:string)=>{
           await store.delPago(id)
           setModal((m:any)=>m?{...m,lista:m.lista.filter((p:any)=>p.id!==id)}:m)
+        }}
+        onUpd={async(id:string,d:any)=>{
+          await store.updPago(id,d)
+          setModal((m:any)=>m?{...m,lista:m.lista.map((p:any)=>p.id===id?{...p,...d}:p)}:m)
         }}
       />}
 
