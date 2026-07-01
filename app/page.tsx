@@ -73,9 +73,9 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
     return{monto:totP,moneda:'pesos',iva:false,items,multi:true}
   }
   const iva=c.iva?true:false
-  if(c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
-  if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return null;return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
-  return null
+  if(!c.tipo||c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
+  if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva);return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
+  return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
 }
 
 function estP(cid:string,mesK:string,pagos:any[]){
