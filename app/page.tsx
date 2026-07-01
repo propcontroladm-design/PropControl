@@ -189,17 +189,7 @@ function useAppData(workspaceId:string, userId:string){
   }
   async function addGasto(d:any){const{data}=await sb.from('gastos').insert({...d,...ws}).select().single();if(data)setGastos(p=>[...p,data]);return data}
   async function delGasto(id:string){await sb.from('gastos').delete().eq('id',id);setGastos(p=>p.filter(x=>x.id!==id))}
-  async function addGrupo(d:any){
-    const{data,error}=await sb.from('grupos').insert({...d,workspace_id:workspaceId}).select().single()
-    if(error){
-      console.error('❌ addGrupo:',error.message)
-      // reintento con usuario_id
-      const{data:d2,error:e2}=await sb.from('grupos').insert({...d,...ws}).select().single()
-      if(e2){console.error('❌ addGrupo retry:',e2.message);alert('Error al guardar grupo: '+e2.message);return null}
-      if(d2)setGrupos(p=>[...p,d2]);return d2
-    }
-    if(data)setGrupos(p=>[...p,data]);return data
-  }
+  async function addGrupo(d:any){const{data,error}=await sb.from('grupos').insert({...d,...ws}).select().single();if(error){console.error('❌ addGrupo:',error.message);alert('Error al guardar grupo: '+error.message);return null};if(data)setGrupos(p=>[...p,data]);return data}
   async function delGrupo(id:string){await sb.from('grupos').delete().eq('id',id);setGrupos(p=>p.filter(x=>x.id!==id))}
   async function addOwner(d:any){const{data}=await sb.from('propietarios').insert({...d,...ws}).select().single();if(data)setOwners(p=>[...p,data]);return data}
   async function updOwner(id:string,d:any){await sb.from('propietarios').update(d).eq('id',id);setOwners(p=>p.map(x=>x.id===id?{...x,...d}:x))}
