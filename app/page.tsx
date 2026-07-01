@@ -1280,7 +1280,28 @@ export default function Dashboard(){
         {rows.map(({c,mObj,lista,total,diff,estado,espP,inq,mesesDebidos}:any)=>{
           const waN=inq?(inq.es_sociedad&&inq.contacto_pagos?inq.contacto_pagos:inq.nombre):''
           const waT=inq?(inq.es_sociedad&&inq.tel_contacto?inq.tel_contacto:inq.telefono):''
-          const waM=waT?`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}. Monto: ${mObj?fmtN(mObj.monto,mObj.moneda):'—'}. Gracias!`:''
+          const waConceptos=(c.conceptos&&c.conceptos.length>0&&mObj)?c.conceptos.map((cp:any)=>{
+            let monto=0,moneda='pesos'
+            if(cp.tipo==='escalonado'&&cp.tramos&&cp.tramos.length>0){
+              const mesDelCalc=new Date(mesVisto.year,mesVisto.month,15).getTime()
+              const t=cp.tramos.find((tr:any)=>{
+                const desde=tr.fechaDesde||tr.fecha_desde||tr.desde
+                const hasta=tr.fechaHasta||tr.fecha_hasta||tr.hasta
+                if(desde&&hasta){const d1=new Date((desde.length===7?desde+'-01':desde)+'T00:00:00').getTime();const d2=new Date((hasta.length===7?hasta+'-28':hasta)+'T23:59:59').getTime();if(!isNaN(d1)&&!isNaN(d2))return mesDelCalc>=d1&&mesDelCalc<=d2}
+                return false
+              })
+              if(t){monto=t.montoBase||t.monto_base||t.monto||0;moneda=t.moneda||cp.moneda||'pesos'}
+            }else{monto=cp.monto||0;moneda=cp.moneda||'pesos'}
+            const vm=(vars&&vars[mk(mesVisto.year,mesVisto.month)])||{}
+            const enPesos=moneda==='pesos'?monto:(moneda==='dolar'?(monto*(vm.dolar||0)):(moneda==='nafta'?(monto*(vm.nafta||0)):monto))
+            const iva=cp.iva?1.21:1
+            const total=enPesos*iva
+            return `  • ${cp.nombre||'Concepto'}: ${moneda!=='pesos'?fmtN(monto,moneda)+' = ':''} ${fmtN(total,'pesos')}${cp.iva?' (c/IVA)':''}`
+          }).join('\n'):null
+          const waM=waT?(waConceptos
+            ?`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}.\n\nDetalle:\n${waConceptos}\n\nTotal: ${mObj?fmtN(espP,'pesos'):'—'}\n\nGracias!`
+            :`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}. Monto: ${mObj?(mObj.moneda!=='pesos'?`${fmtN(mObj.monto,mObj.moneda)} (${fmtN(espP,'pesos')})`:fmtN(mObj.monto,'pesos')):'—'}. Gracias!`
+          ):''
           return(
             <div key={c.id} style={{background:'white',borderRadius:14,border:'1px solid #e5e7eb',padding:13,marginBottom:9,boxShadow:'0 1px 3px rgba(0,0,0,.07)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
