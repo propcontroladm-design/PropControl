@@ -80,7 +80,7 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
     return{monto:totP,moneda:'pesos',iva:false,items,multi:true}
   }
   const iva=c.iva?true:false
-  if(!c.tipo||c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
+  if(!c.tipo||c.tipo==='fijo'||c.tipo==='multi')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
   if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva);const tMonto=t.montoBase||t.monto_base||t.monto;return cb(tMonto,t.moneda||c.moneda,t.ajuste||'ninguno',t.indiceId||t.indice_id,t.frecAjuste||t.frec_ajuste||'mensual',iva)}
   return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
 }
@@ -1881,7 +1881,8 @@ export default function Dashboard(){
       {modal?.type==='contrato'&&<FormContrato
         ini={modal.data} props={props} inqs={inqs}
         onSave={async(d:any)=>{
-          const payload:any={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,fecha_fin:d.fecha_fin||null,fecha_control_desde:d.fecha_control_desde||null,propiedades_ids:d.propiedades_ids||[],activo:true,tipo:d.tipo,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino}
+          const tipoGuardar=(d.conceptos&&d.conceptos.length>0)?'fijo':(d.tipo==='escalonado'?'escalonado':'fijo')
+          const payload:any={propiedad_id:d.propiedad_id,inquilino_id:d.inquilino_id,fecha_inicio:d.fecha_inicio,fecha_fin:d.fecha_fin||null,fecha_control_desde:d.fecha_control_desde||null,propiedades_ids:d.propiedades_ids||[],activo:true,tipo:tipoGuardar,moneda:d.moneda,monto_base:d.monto_base||0,ajuste:d.ajuste||'ninguno',frec_ajuste:d.frec_ajuste||'mensual',iva:d.iva||false,tramos:d.tramos||[],conceptos:d.conceptos||[],nombre_propiedad:d.nombre_propiedad,nombre_inquilino:d.nombre_inquilino}
           if(modal.data)await store.updContrato(modal.data.id,payload)
           else await store.addContrato(payload)
         }}
