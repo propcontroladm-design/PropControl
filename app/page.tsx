@@ -63,7 +63,9 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
       if(cp.tipo==='escalonado'&&cp.tramos&&cp.tramos.length>0){
         const t=calcEscalonado(cp.tramos)
         if(!t)return{monto:0,moneda:cp.moneda||'pesos',iva:!!cp.iva,nombre:cp.nombre,fueraDeRango:true}
-        const r=cb(t.montoBase,t.moneda||cp.moneda,t.ajuste||'ninguno',t.indiceId,t.frecAjuste||'mensual',cp.iva)
+        const tMonto=t.montoBase||t.monto_base||t.monto||0
+        const tMoneda=t.moneda||cp.moneda||'pesos'
+        const r=cb(tMonto,tMoneda,t.ajuste||'ninguno',t.indiceId||t.indice_id,t.frecAjuste||t.frec_ajuste||'mensual',cp.iva)
         return{...r,nombre:cp.nombre||'Concepto'}
       }
       // Concepto fijo
