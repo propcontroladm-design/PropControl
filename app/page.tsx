@@ -1189,7 +1189,7 @@ export default function Dashboard(){
       const espP=toP(mObj,vm)
       const {lista,total}=estP(c.id,mesVisto.key,pagos)
       const diff=total-espP
-      const estado=espP===0&&total===0?'pendiente':(espP>0&&diff>=-0.5?'pagado':(total>0?'parcial':'pendiente'))
+      const estado=espP<0.5?(total<0.5?'pendiente':'parcial'):(diff>=-0.5?'pagado':(total>0.5?'parcial':'pendiente'))
       const inq=inqs.find(i=>i.id===c.inquilino_id)
       // Detectar deuda histórica respetando "fecha_control_desde"
       let mesesDebidos=0
@@ -1572,7 +1572,7 @@ export default function Dashboard(){
       const espP=toP(mObj,vm)
       const {lista,total}=estP(c.id,mesActK,pagos)
       const diff=total-espP
-      const estado=espP===0&&total===0?'pendiente':(espP>0&&diff>=-0.5?'pagado':(total>0?'parcial':'pendiente'))
+      const estado=espP<0.5?(total<0.5?'pendiente':'parcial'):(diff>=-0.5?'pagado':(total>0.5?'parcial':'pendiente'))
       const inq=inqs.find(i=>i.id===c.inquilino_id)
       return{c,mObj,lista,total,diff,estado,espP,inq}
     })
