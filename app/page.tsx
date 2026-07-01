@@ -29,17 +29,22 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   function debeAj(fr:string){if(!fr||fr==='mensual')return true;if(fr==='trimestral')return (mr-1)%3===0;if(fr==='semestral')return (mr-1)%6===0;if(fr==='anual')return (mr-1)%12===0;return true}
   function calcEscalonado(tramos:any[]){
     if(!tramos||tramos.length===0)return null
-    // Soporta ambos formatos: por mes (legacy) o por fecha (nuevo)
     const mesDelCalc=new Date(y,m,15).getTime()
     const t=tramos.find((tr:any)=>{
-      // Si tiene fechas, usar fechas
-      if(tr.fechaDesde&&tr.fechaHasta){
-        const d1=new Date(tr.fechaDesde+'T00:00:00').getTime()
-        const d2=new Date(tr.fechaHasta+'T23:59:59').getTime()
-        return mesDelCalc>=d1&&mesDelCalc<=d2
+      // Soporta camelCase y snake_case para fechas
+      const desde=tr.fechaDesde||tr.fecha_desde||tr.desde
+      const hasta=tr.fechaHasta||tr.fecha_hasta||tr.hasta
+      if(desde&&hasta){
+        // Si es formato YYYY-MM (sin día), agregar -01 o -28
+        const d1=new Date((desde.length===7?desde+'-01':desde)+'T00:00:00').getTime()
+        const d2=new Date((hasta.length===7?hasta+'-28':hasta)+'T23:59:59').getTime()
+        if(!isNaN(d1)&&!isNaN(d2))return mesDelCalc>=d1&&mesDelCalc<=d2
       }
-      // Legacy: por número de mes desde inicio de contrato
-      return mr>=tr.mesDesde&&mr<=tr.mesHasta
+      // Legacy: monto_base por número de mes relativo al contrato
+      const md=tr.mesDesde||tr.mes_desde
+      const mh=tr.mesHasta||tr.mes_hasta
+      if(md!=null&&mh!=null)return mr>=md&&mr<=mh
+      return false
     })
     return t||null
   }
@@ -74,7 +79,7 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   }
   const iva=c.iva?true:false
   if(!c.tipo||c.tipo==='fijo')return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
-  if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva);return cb(t.montoBase,t.moneda||c.moneda,t.ajuste,t.indiceId,t.frecAjuste,iva)}
+  if(c.tipo==='escalonado'){const t=calcEscalonado(c.tramos);if(!t)return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva);const tMonto=t.montoBase||t.monto_base||t.monto;return cb(tMonto,t.moneda||c.moneda,t.ajuste||'ninguno',t.indiceId||t.indice_id,t.frecAjuste||t.frec_ajuste||'mensual',iva)}
   return cb(c.monto_base,c.moneda,c.ajuste,c.indice_id,c.frec_ajuste,iva)
 }
 
