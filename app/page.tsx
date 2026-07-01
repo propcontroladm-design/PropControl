@@ -1931,7 +1931,7 @@ export default function Dashboard(){
 
       {modal?.type==='grupo'&&<FormGrupo
         ini={modal.data} grupos={grupos}
-        onSave={async(d:any)=>{if(modal.data)await store.updGrupo(modal.data.id,d);else await store.addGrupo(d)}}
+        onSave={async(d:any)=>{const g={...d,parent_id:d.parent_id||null};if(modal.data)await store.updGrupo(modal.data.id,g);else await store.addGrupo(g)}}
         onDelete={async()=>{if(modal.data)await store.delGrupo(modal.data.id)}}
         onClose={()=>setModal(null)}
       />}
