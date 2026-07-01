@@ -1056,6 +1056,7 @@ export default function Dashboard(){
   }
 
   useEffect(()=>{
+    const safetyTimer=setTimeout(()=>setAuthLoading(false),8000)
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
       sb.auth.getSession().then(async({data:{session}})=>{
@@ -1077,11 +1078,12 @@ export default function Dashboard(){
       return
     }
     sb.auth.getSession().then(async({data:{session}})=>{
-      if(!session){router.push('/');return}
+      if(!session){setAuthLoading(false);return}
       setUser(session.user)
       await loadUserAndWorkspaces(session.user.id)
       setAuthLoading(false)
-    })
+    }).catch(()=>setAuthLoading(false))
+    return()=>clearTimeout(safetyTimer)
   },[])
 
   useEffect(()=>{
