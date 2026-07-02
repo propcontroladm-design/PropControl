@@ -50,9 +50,30 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
   }
   function cb(base:number,mon:string,aj:string,iid:string,fr:string,iva:boolean){
     let v=parseFloat(String(base))||0
-    if(debeAj(fr)){
-      if(aj==='ipc'&&vm.ipc)v=v*(1+vm.ipc/100)
-      else if(aj==='custom'&&iid&&idx){const x=idx.find((i:any)=>i.id===iid);if(x?.valores?.[mesK])v=v*(1+x.valores[mesK]/100)}
+    if(aj==='ipc'||aj==='ica'){
+      // Acumula IPC/ICA por períodos completos desde el inicio del contrato
+      const frecMap:any={mensual:1,bimestral:2,trimestral:3,cuatrimestral:4,semestral:6,anual:12}
+      const frec=frecMap[fr]||4
+      const ini2=new Date((c.fecha_inicio||'2025-01-01')+'T00:00:00')
+      const iniY=ini2.getFullYear(),iniMo=ini2.getMonth()
+      const mr2=(y-iniY)*12+(m-iniMo) // meses desde inicio (0=primer mes)
+      const nPeriodos=Math.floor(mr2/frec)
+      let monto=v
+      for(let p=0;p<nPeriodos;p++){
+        let acc=1
+        for(let i=0;i<frec;i++){
+          const mi=p*frec+i
+          const ay=iniY+Math.floor((iniMo+mi)/12)
+          const am=(iniMo+mi)%12
+          const k=mk(ay,am)
+          const val=aj==='ica'?((vars&&vars[k]?.ica)||0):((vars&&vars[k]?.ipc)||0)
+          acc*=(1+val/100)
+        }
+        monto*=acc
+      }
+      v=monto
+    } else if(debeAj(fr)&&aj==='custom'&&iid&&idx){
+      const x=idx.find((ii:any)=>ii.id===iid);if(x?.valores?.[mesK])v=v*(1+x.valores[mesK]/100)
     }
     return{monto:v*(iva?1.21:1),moneda:mon||'pesos',iva:!!iva}
   }
