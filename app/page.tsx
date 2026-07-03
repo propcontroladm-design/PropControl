@@ -54,7 +54,8 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
       // Acumula IPC/ICA por períodos completos desde el inicio del contrato
       const frecMap:any={mensual:1,bimestral:2,trimestral:3,cuatrimestral:4,semestral:6,anual:12}
       const frec=frecMap[fr]||4
-      const ini2=new Date((c.fecha_inicio||'2025-01-01')+'T00:00:00')
+      const fechaBase=c.fecha_control_desde||c.fecha_inicio||'2025-01-01'
+      const ini2=new Date(fechaBase+'T00:00:00')
       const iniY=ini2.getFullYear(),iniMo=ini2.getMonth()
       const mr2=(y-iniY)*12+(m-iniMo) // meses desde inicio (0=primer mes)
       const nPeriodos=Math.floor(mr2/frec)
