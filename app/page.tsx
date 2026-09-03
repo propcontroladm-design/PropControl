@@ -1629,6 +1629,33 @@ export default function Dashboard(){
     const totEsp=rows.reduce((s,r)=>s+r.espP,0)
     const totCob=rows.reduce((s,r)=>s+r.total,0)
 
+    // Histórico últimos 12 meses: esperado vs cobrado (desglosado por dólares/transferencia/efectivo) y deuda
+    const MESC=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    const histMeses:any[]=[]
+    for(let i=11;i>=0;i--){
+      const d=new Date(NOW.getFullYear(),NOW.getMonth()-i,1)
+      const y=d.getFullYear(),m=d.getMonth(),key=mk(y,m)
+      const iniMs=new Date(y,m,1).getTime()
+      const finMs=new Date(y,m+1,0,23,59,59).getTime()
+      let esp=0
+      contratos.filter(c=>c.activo!==false).forEach(c=>{
+        if(c.fecha_inicio&&new Date(c.fecha_inicio+'T00:00:00').getTime()>finMs)return
+        if(c.fecha_fin&&new Date(c.fecha_fin+'T23:59:59').getTime()<iniMs)return
+        if(c.fecha_control_desde&&new Date(c.fecha_control_desde+'T00:00:00').getTime()>finMs)return
+        const mO=calcM(c,y,m,vars,[])
+        esp+=toP(mO,(vars&&vars[key])||{})
+      })
+      let dol=0,efe=0,tra=0
+      pagos.filter((p:any)=>p.periodo===key).forEach((p:any)=>{
+        const mp=p.monto_pesos||0
+        if(p.moneda==='dolar')dol+=mp
+        else if(p.tipo_pago==='efectivo')efe+=mp
+        else tra+=mp
+      })
+      const cob=dol+efe+tra
+      histMeses.push({key,y,m,esp,dol,efe,tra,cob,deuda:Math.max(0,esp-cob)})
+    }
+
     const exportar=()=>{
       const lines=[`PropControl — Reporte ${mlbl(NOW.getFullYear(),NOW.getMonth())}`,'','Propiedad | Inquilino | Esperado | Pagado | Estado']
       rows.forEach(r=>lines.push(`${r.c.nombre_propiedad||'—'} | ${r.inq?r.inq.nombre:'—'} | ${r.mObj?fmtN(r.mObj.monto,r.mObj.moneda):'—'} | ${fmtN(r.total,'pesos')} | ${r.estado}`))
@@ -1661,6 +1688,34 @@ export default function Dashboard(){
             <div style={{fontSize:10,color:'#6b7280'}}>Deuda total</div>
           </div>
         </div>
+        {histMeses.some(h=>h.esp>0||h.cob>0)&&(()=>{
+          const H=110
+          const maxV=Math.max(...histMeses.map(h=>Math.max(h.esp,h.cob)),1)
+          const totalDeuda=histMeses.reduce((s,h)=>s+h.deuda,0)
+          const segs=[{k:'dol',c:'#2563eb'},{k:'tra',c:'#22c55e'},{k:'efe',c:'#f59e0b'},{k:'deuda',c:'#ef4444'}]
+          const leg=[{c:'#2563eb',l:'Dólares'},{c:'#22c55e',l:'Transferencia'},{c:'#f59e0b',l:'Efectivo'},{c:'#ef4444',l:'Deuda'}]
+          return(
+            <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:12,padding:12,marginBottom:11,boxShadow:'0 1px 3px rgba(0,0,0,.07)'}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#111827',marginBottom:12}}>Histórico — últimos 12 meses</div>
+              <div style={{display:'flex',alignItems:'flex-end',gap:3,height:H}}>
+                {histMeses.map(h=>(
+                  <div key={h.key} title={`${MESC[h.m]} ${h.y}\nEsperado: ${fmtN(h.esp,'pesos')}\nCobrado: ${fmtN(h.cob,'pesos')}\n  Dólares: ${fmtN(h.dol,'pesos')}\n  Transferencia: ${fmtN(h.tra,'pesos')}\n  Efectivo: ${fmtN(h.efe,'pesos')}\nDeuda: ${fmtN(h.deuda,'pesos')}`} style={{flex:1,display:'flex',flexDirection:'column-reverse',height:H,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                    {segs.map(s=>{const v=h[s.k]||0;const px=Math.round(v/maxV*H);return px>0?<div key={s.k} style={{height:px,background:s.c}}/>:null})}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:3,marginTop:4}}>
+                {histMeses.map(h=>{const ea=h.m===NOW.getMonth()&&h.y===NOW.getFullYear();return(<div key={h.key} style={{flex:1,textAlign:'center',fontSize:9,color:ea?'#2563eb':'#94a3b8',fontWeight:ea?700:500}}>{MESC[h.m]}</div>)})}
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px 12px',marginTop:11,justifyContent:'center',fontSize:11,color:'#6b7280'}}>
+                {leg.map(x=>(<span key={x.l} style={{display:'flex',alignItems:'center',gap:4}}><span style={{width:10,height:10,borderRadius:2,background:x.c,display:'inline-block'}}/>{x.l}</span>))}
+              </div>
+              <div style={{marginTop:11,padding:'8px 10px',borderRadius:8,fontSize:12,fontWeight:600,textAlign:'center',background:totalDeuda>0.5?'#fee2e2':'#dcfce7',color:totalDeuda>0.5?'#991b1b':'#166534'}}>
+                {totalDeuda>0.5?`⚠️ Deuda acumulada (12 meses): ${fmtN(totalDeuda,'pesos')}`:'✅ Sin deuda en los últimos 12 meses'}
+              </div>
+            </div>
+          )
+        })()}
         {rows.map(({c,mObj,lista,total,diff,estado,espP,inq})=>(
           <div key={c.id} style={S.card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:5}}>
