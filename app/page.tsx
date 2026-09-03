@@ -1210,7 +1210,8 @@ export default function Dashboard(){
       return true
     }).map(c=>{
       const mObj=calcM(c,mesVisto.year,mesVisto.month,vars,[])
-      const espP=toP(mObj,vm)
+      const vmMes=(vars&&vars[mesVisto.key])||{}
+      const espP=toP(mObj,vmMes)
       const {lista,total}=estP(c.id,mesVisto.key,pagos)
       const diff=total-espP
       const estado=espP<0.5?(total<0.5?'pendiente':'parcial'):(diff>=-0.5?'pagado':(total>0.5?'parcial':'pendiente'))
@@ -1231,7 +1232,8 @@ export default function Dashboard(){
           if(k!==mesVisto.key){
             const {total:t}=estP(c.id,k,pagos)
             const mO=calcM(c,y,m,vars,[])
-            const eP=toP(mO,vm)
+            const vmK=(vars&&vars[k])||{}
+            const eP=toP(mO,vmK)
             if(eP>0&&t<eP-0.5)mesesDebidos++
           }
           m++
