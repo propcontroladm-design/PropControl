@@ -1322,9 +1322,12 @@ export default function Dashboard(){
             const total=enPesos*iva
             return `  • ${cp.nombre||'Concepto'}: ${moneda!=='pesos'?fmtN(monto,moneda)+' = ':''} ${fmtN(total,'pesos')}${cp.iva?' (c/IVA)':''}`
           }).join('\n'):null
+          const vmMesWa=(vars&&vars[mk(mesVisto.year,mesVisto.month)])||{}
+          const usaDolar=!!(mObj&&(mObj.moneda==='dolar'||(mObj.items&&mObj.items.some((it:any)=>it.moneda==='dolar'))))
+          const cotizTxt=(usaDolar&&vmMesWa.dolar)?`\nCotización dólar tomada: ${fmtN(vmMesWa.dolar,'pesos')}`:''
           const waM=waT?(waConceptos
-            ?`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}.\n\nDetalle:\n${waConceptos}\n\nTotal: ${mObj?fmtN(espP,'pesos'):'—'}\n\nGracias!`
-            :`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}. Monto: ${mObj?(mObj.moneda!=='pesos'?`${fmtN(mObj.monto,mObj.moneda)} (${fmtN(espP,'pesos')})`:fmtN(mObj.monto,'pesos')):'—'}. Gracias!`
+            ?`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}.\n\nDetalle:\n${waConceptos}\n\nTotal: ${mObj?fmtN(espP,'pesos'):'—'}${cotizTxt}\n\nGracias!`
+            :`Hola ${waN}! Te recuerdo el vencimiento de ${c.nombre_propiedad||''} para ${mlbl(mesVisto.year,mesVisto.month)}. Monto: ${mObj?(mObj.moneda!=='pesos'?`${fmtN(mObj.monto,mObj.moneda)} (${fmtN(espP,'pesos')})`:fmtN(mObj.monto,'pesos')):'—'}.${cotizTxt}\n\nGracias!`
           ):''
           return(
             <div key={c.id} style={{background:'white',borderRadius:14,border:'1px solid #e5e7eb',padding:13,marginBottom:9,boxShadow:'0 1px 3px rgba(0,0,0,.07)'}}>
