@@ -1518,7 +1518,7 @@ export default function Dashboard(){
       if(diff>baseAtras)baseAtras=diff
     })
     const atras=Math.min(baseAtras+varsExtraAtras,600)
-    const meses=[]
+    const meses:any[]=[]
     for(let i=-atras;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mk(d.getFullYear(),d.getMonth())})}
     const fields=[{id:'dolar',l:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',l:'Nafta ($ por litro)',ph:'950'}]
     const customs=store.varsCustom||[]
