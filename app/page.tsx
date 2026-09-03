@@ -1064,6 +1064,7 @@ export default function Dashboard(){
   const [searchInqs,setSearchInqs]=useState('')
   const [mesVistoYear,setMesVistoYear]=useState(NOW.getFullYear())
   const [mesVistoMonth,setMesVistoMonth]=useState(NOW.getMonth())
+  const [varsExtraAtras,setVarsExtraAtras]=useState(0)
 
   async function loadUserAndWorkspaces(uid:string){
     const{data:userRow}=await sb.from('usuarios').select('*').eq('id',uid).single()
@@ -1503,8 +1504,19 @@ export default function Dashboard(){
 
   // ── TAB VARS ────────────────────────────────
   const renderVars=()=>{
+    // Rango de meses: desde el contrato más antiguo (mínimo 12 meses atrás) hasta 3 adelante, ampliable
+    let baseAtras=12
+    contratos.forEach(c=>{
+      const f=c.fecha_control_desde||c.fecha_inicio
+      if(!f)return
+      const d=new Date(f+'T00:00:00')
+      if(isNaN(d.getTime()))return
+      const diff=(NOW.getFullYear()-d.getFullYear())*12+(NOW.getMonth()-d.getMonth())
+      if(diff>baseAtras)baseAtras=diff
+    })
+    const atras=Math.min(baseAtras+varsExtraAtras,600)
     const meses=[]
-    for(let i=-1;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mk(d.getFullYear(),d.getMonth())})}
+    for(let i=-atras;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mk(d.getFullYear(),d.getMonth())})}
     const fields=[{id:'dolar',l:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',l:'Nafta ($ por litro)',ph:'950'},{id:'ipc',l:'IPC variación (%)',ph:'4.5'}]
     const customs=store.varsCustom||[]
     return(
@@ -1563,6 +1575,7 @@ export default function Dashboard(){
             </div>
           )
         })}
+        <button onClick={()=>setVarsExtraAtras(v=>v+12)} style={{...S.btnS,marginTop:4}}>▲ Ver 12 meses más antiguos</button>
         <div style={{height:70}}/>
       </div>
     )
