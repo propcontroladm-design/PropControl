@@ -67,7 +67,9 @@ function calcM(alq:any,y:number,m:number,vars:any,idx:any[]){
           const ay=iniY+Math.floor((iniMo+mi)/12)
           const am=(iniMo+mi)%12
           const k=mk(ay,am)
-          const val=aj==='ica'?((vars&&vars[k]?.ica)||0):((vars&&vars[k]?.ipc)||0)
+          const vk=vars&&vars[k]
+          // Usa el IPC real/definitivo si ya se cargó; si no, cae al estimado (para cobrar antes de la publicación oficial)
+          const val=aj==='ica'?((vk?.ica)||0):(vk?.ipc!=null?vk.ipc:((vk?.ipc_estimado)||0))
           acc*=(1+val/100)
         }
         monto*=acc
@@ -151,7 +153,7 @@ function useAppData(workspaceId:string, userId:string){
     setVarsCustom(vc.data||[])
     const vRes=await sb.from('variables').select('*').eq('workspace_id',workspaceId)
     const vMap:any={}
-    ;(vRes.data||[]).forEach((v:any)=>{vMap[v.periodo]={dolar:v.dolar,nafta:v.nafta,ipc:v.ipc,valores_custom:v.valores_custom||{}}})
+    ;(vRes.data||[]).forEach((v:any)=>{vMap[v.periodo]={dolar:v.dolar,nafta:v.nafta,ipc:v.ipc,ipc_estimado:v.ipc_estimado,valores_custom:v.valores_custom||{}}})
     setVars(vMap)
     setLoading(false)
   }
@@ -1065,6 +1067,7 @@ export default function Dashboard(){
   const [mesVistoYear,setMesVistoYear]=useState(NOW.getFullYear())
   const [mesVistoMonth,setMesVistoMonth]=useState(NOW.getMonth())
   const [varsExtraAtras,setVarsExtraAtras]=useState(0)
+  const [ipcCargando,setIpcCargando]=useState(false)
 
   async function loadUserAndWorkspaces(uid:string){
     const{data:userRow}=await sb.from('usuarios').select('*').eq('id',uid).single()
@@ -1517,8 +1520,28 @@ export default function Dashboard(){
     const atras=Math.min(baseAtras+varsExtraAtras,600)
     const meses=[]
     for(let i=-atras;i<=3;i++){const d=new Date(NOW.getFullYear(),NOW.getMonth()+i,1);meses.push({year:d.getFullYear(),month:d.getMonth(),key:mk(d.getFullYear(),d.getMonth())})}
-    const fields=[{id:'dolar',l:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',l:'Nafta ($ por litro)',ph:'950'},{id:'ipc',l:'IPC variación (%)',ph:'4.5'}]
+    const fields=[{id:'dolar',l:'Dólar ($ por U$D)',ph:'1200'},{id:'nafta',l:'Nafta ($ por litro)',ph:'950'}]
     const customs=store.varsCustom||[]
+
+    async function cargarIPCOficial(){
+      setIpcCargando(true)
+      try{
+        const r=await fetch('/api/ipc')
+        const data=await r.json()
+        if(!Array.isArray(data))throw new Error(data?.error||'respuesta inválida')
+        const porPeriodo:any={}
+        data.forEach((d:any)=>{porPeriodo[d.periodo]=d.valor})
+        const periodosVisibles=meses.map(m=>m.key)
+        let n=0
+        for(const p of periodosVisibles){
+          if(porPeriodo[p]!=null){await store.setVar(p,'ipc',porPeriodo[p]);n++}
+        }
+        alert(n>0?`✅ Se cargó el IPC oficial (INDEC) en ${n} mes${n>1?'es':''}.`:'ℹ️ No hay meses nuevos para cargar (puede que el IPC más reciente todavía no esté publicado).')
+      }catch(e:any){
+        alert('❌ No se pudo traer el IPC: '+(e.message||'error'))
+      }
+      setIpcCargando(false)
+    }
     return(
       <div style={{padding:14}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
@@ -1528,7 +1551,8 @@ export default function Dashboard(){
           </div>
           <button onClick={()=>setModal({type:'varCustom',data:null})} style={{background:'linear-gradient(135deg,#2563eb,#1e3a8a)',color:'white',padding:'8px 14px',borderRadius:9,fontSize:12,fontWeight:700,border:'none',cursor:'pointer'}}>+ Nueva variable</button>
         </div>
-        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:11,background:'#dbeafe',color:'#1e3a8a'}}>💡 Cargá los valores de cada mes. Las variables predefinidas (Dólar, Nafta, IPC) ya están creadas. Podés agregar las tuyas (ej: aumento del consorcio, ICL).</div>
+        <button onClick={cargarIPCOficial} disabled={ipcCargando} style={{width:'100%',marginBottom:9,background:ipcCargando?'#94a3b8':'linear-gradient(135deg,#16a34a,#15803d)',color:'white',padding:'10px 14px',borderRadius:9,fontSize:13,fontWeight:700,border:'none',cursor:ipcCargando?'default':'pointer'}}>{ipcCargando?'Cargando…':'🔄 Traer IPC oficial (INDEC) automáticamente'}</button>
+        <div style={{padding:'9px 11px',borderRadius:9,fontSize:12,marginBottom:11,background:'#dbeafe',color:'#1e3a8a'}}>💡 Cargá los valores de cada mes. Las variables predefinidas (Dólar, Nafta, IPC) ya están creadas. Podés agregar las tuyas (ej: aumento del consorcio, ICL).<br/>📊 <b>IPC:</b> el botón verde trae el valor <b>real</b> ya publicado por INDEC para todos los meses posibles. Si necesitás cobrar antes de que salga el dato oficial (día 10), cargá vos el <b>estimado</b> mientras tanto — apenas el real esté disponible (a mano o con el botón), la app lo usa automáticamente y ajusta los meses siguientes.</div>
         
         {/* Variables custom: header con opciones */}
         {customs.length>0&&<div style={{background:'white',borderRadius:11,border:'1px solid #e5e7eb',padding:10,marginBottom:11}}>
@@ -1564,6 +1588,17 @@ export default function Dashboard(){
                   <input style={{width:105,padding:'6px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:14,textAlign:'right',background:'white'}} type="number" placeholder={f.ph} value={(v as any)[f.id]||''} onChange={e=>store.setVar(m.key,f.id,parseFloat(e.target.value)||0)}/>
                 </div>
               ))}
+              <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
+                <span style={{fontSize:13,color:'#6b7280',flex:1}}>IPC estimado (%) <span style={{color:'#94a3b8'}}>· para cobrar antes del 10</span></span>
+                <input style={{width:105,padding:'6px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:14,textAlign:'right',background:'white'}} type="number" step="0.01" placeholder="4.5" value={v.ipc_estimado||''} onChange={e=>store.setVar(m.key,'ipc_estimado',parseFloat(e.target.value)||0)}/>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
+                <span style={{fontSize:13,color:'#6b7280',flex:1}}>IPC real / definitivo (%)</span>
+                <input style={{width:105,padding:'6px 8px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:14,textAlign:'right',background:'white'}} type="number" step="0.01" placeholder="4.5" value={v.ipc||''} onChange={e=>store.setVar(m.key,'ipc',parseFloat(e.target.value)||0)}/>
+              </div>
+              {(v.ipc!=null||v.ipc_estimado!=null)&&<div style={{fontSize:11,marginBottom:7,color:v.ipc!=null?'#16a34a':'#d97706',fontWeight:600}}>
+                {v.ipc!=null?'✅ Usando el valor real (definitivo)':'⏳ Usando el estimado — falta cargar el real de INDEC'}
+              </div>}
               {customs.length>0&&<div style={{borderTop:'1px solid #e5e7eb',marginTop:7,paddingTop:7}}>
                 {customs.map((cv:any)=>(
                   <div key={cv.id} style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
